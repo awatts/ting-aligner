@@ -5,6 +5,10 @@
 *~
 *.swp
 
+# old versions
+*.old
+
+# binaries and whatnot that aren't ours
 bin/*
 data/*
 tests/*
@@ -12,3 +16,5 @@ tools/*.pl
 tools/*.sh
 tools/*.txt
 tools/*.dic
+tools/s3ep
+tools/subdic
