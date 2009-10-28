@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use warnings;
+use Carp;
 
 # align.pl
 # author: Ting Qian <ting.qian@rochester.edu>
@@ -10,6 +11,7 @@ use warnings;
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
 use Audio::Wav;
+use File::Copy;
 
 my $audio_fn = shift @ARGV;
 my $text_fn = shift @ARGV;
@@ -21,7 +23,7 @@ my $manual_end = shift @ARGV;
 sub get_wave_length {
     my $wave_file = "";
     ($wave_file) = @_;
-    my $wav = new Audio::Wav;
+    my $wav = Audio::Wav->new;
     my $read = $wav -> read($wave_file);
     my $length = $read -> length_seconds();
     return int($length * 100);
@@ -32,15 +34,14 @@ sub get_wave_length {
 # Return: an array of strings, one per cell, of
 #         the cleaned transcript
 sub clean_transcript {
-    my $transcript_fn;
+    my ($transcript_fn) = @_;
     my @new_transcript_text;
-    ($transcript_fn) = @_;
     open TRANSCRIPT_FP, $transcript_fn;
     while (<TRANSCRIPT_FP>) {
-	chomp;
-	$_ =~ s/@\S+//ig;
-	$_ =~ s/\///g;
-	push @new_transcript_text, $_;
+		chomp;
+		$_ =~ s/@\S+//igx;
+		$_ =~ s/\///gx;
+		push @new_transcript_text, $_;
     }
     return \@new_transcript_text;
 }
@@ -54,7 +55,7 @@ sub write_to_file {
     print @$arr_ref;
     open OUTPUT_FP, ">$output_fn";
     foreach my $line (@$arr_ref) {
-	print OUTPUT_FP "$line\n";
+		print OUTPUT_FP "$line\n";
     }
     close OUTPUT_FP;
 }
@@ -71,12 +72,12 @@ unless(-e $text_fn) {
 #unless (-e '${ALIGNMENT_HOME}/') { die "Cannot find aligning scripts.\n";}
 
 # pre-process transcript text
-&write_to_file(&clean_transcript($text_fn), "$text_fn.cleaned");
+write_to_file(clean_transcript($text_fn), "${text_fn}.cleaned");
 
 # get the length of the audio file
-# this must be done at the beginning to 
+# this must be done at the beginning to
 # avoid conflict with SPHINX
-my $length = &get_wave_length($audio_fn);
+my $length = get_wave_length($audio_fn);
 
 # get the name of the subject
 # assuming the audio file is named as subject.wav
@@ -85,15 +86,15 @@ my $experiment = $1;
 
 # make a folder to store the files
 unless (-e $experiment) {
-    system("mkdir $experiment");
+    mkdir $experiment or croak "Could not make directory: $!";
 }
 
 # copy audio file and transcript to that folder
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
-system("cp $text_fn.cleaned $experiment/transcript");
+copy("${text_fn}.cleaned", "${experiment}/transcript") or croak "Copy failed: $!";
 
-chdir($experiment) || 
-    die 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
+chdir($experiment) ||
+    croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
 
 system("get-transcript-vocab.sh");
 system('subdic -var -ood ood-vocab.txt vocab.txt <${ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic >vocab.dic');
@@ -108,19 +109,19 @@ if (defined $manual_end) {
     print "Press ENTER when you hear a boundary\n";
     print "Then press CTRL + D\n";
     print "====================================\n";
-    
+
     my $pid = fork();
     if ($pid == -1) {
-	die;
+		croak;
     } elsif ($pid == 0) {
-	exec 'find-manual-boundaries.pl';
+		exec 'find-manual-boundaries.pl';
     }
     while (wait() != -1) {}
-    
+
 # generate control file
     system("make-ctl.pl");
 } else {
-    # get the length of audio file    
+    # get the length of audio file
     # write control file
     open CTL, ">ctl";
     print CTL "./\t0\t$length\tutt1\n";
