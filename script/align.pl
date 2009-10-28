@@ -12,6 +12,7 @@ use Carp;
 
 use Audio::Wav;
 use File::Copy;
+use File::Spec;
 
 my $audio_fn = shift @ARGV;
 my $text_fn = shift @ARGV;
@@ -79,10 +80,11 @@ write_to_file(clean_transcript($text_fn), "${text_fn}.cleaned");
 # avoid conflict with SPHINX
 my $length = get_wave_length($audio_fn);
 
-# get the name of the subject
-# assuming the audio file is named as subject.wav
-$audio_fn =~ /(\w*)[.]wav/;
-my $experiment = $1;
+# get the final part of the path component in order to name the results dir
+my ($volume,$directories,$file) = File::Spec->splitpath( $audio_fn );
+my $cdirs = File::Spec->canonpath($directories);
+my @dirs = File::Spec->splitdir($cdirs);
+my $experiment = $dirs[-1];
 
 # make a folder to store the files
 unless (-e $experiment) {
