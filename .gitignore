@@ -1,0 +1,14 @@
+# MacOS directory info
+.DS_Store
+
+# swapfiles
+*~
+*.swp
+
+bin/*
+data/*
+tests/*
+tools/*.pl
+tools/*.sh
+tools/*.txt
+tools/*.dic

@@ -1,0 +1,32 @@
+# where the scripts are
+ALIGNMENT_HOME=/p/hlp/tools/aligner/tools/
+
+# get text from a Word document
+CATDOC=catdoc
+
+# audio tools
+ # get raw PCM audio from .ac3 files
+MPLAYER=mplayer
+ # play wav files with minimal text output.
+APLAY=afplay
+
+# set this to "-x" if you're on a PPC Mac or other big-endian machine
+SWAP_WORD_ORDER=
+
+# aligner
+ALIGNER_BIN_HOME=/p/hlp/tools/aligner/bin
+ALIGNER_SCRIPT_HOME=/p/hlp/tools/aligner/script
+ALIGNER_DATA_HOME=/p/hlp/tools/aligner/data
+
+# sphinx 3
+S3_BIN=/usr/local/bin
+S3_MODELS=/p/hlp/tools/aligner/data/hub4_cd_continuous_8gau_1s_c_d_dd
+S3EP_MODELS=/usr/local/share/sphinx3/model/ep
+
+# SphinxTrain
+WAVE2FEAT=/Volumes/bender/p/hlp/tools/SphinxTrain-1.0/bin.i686-apple-darwin9.7.0/wave2feat
+
+export ALIGNMENT_HOME CATDOC MPLAYER APLAY SWAP_WORD_ORDER S3_BIN S3_MODELS S3EP_MODELS WAVE2FEAT ALIGNER_SCRIPT_HOME ALIGNER_BIN_HOME ALIGNER_DATA_HOME
+
+export PATH=$PATH:$ALIGNMENT_HOME:$ALIGNER_SCRIPT_HOME:$ALIGNER_BIN_HOME:$ALIGNER_DATA_HOME
+
