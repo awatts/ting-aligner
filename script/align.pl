@@ -15,6 +15,7 @@ use Carp;
 use Audio::Wav;
 use File::Copy;
 use File::Spec;
+use File::Util;
 
 my $audio_fn = shift @ARGV;
 my $text_fn = shift @ARGV;
@@ -87,12 +88,16 @@ my $length = get_wave_length($audio_fn);
 my ($volume,$directories,$file) = File::Spec->splitpath( $audio_fn );
 my $cdirs = File::Spec->canonpath($directories);
 my @dirs = File::Spec->splitdir($cdirs);
-my $experiment = $dirs[-1];
+
+my $experiment;
+if ($#dirs >= 0) {
+	$experiment = "$dirs[-1]/$file/";
+} else {
+	$experiment = $file;
+}
 
 # make a folder to store the files
-unless (-e $experiment) {
-    mkdir $experiment or croak "Could not make directory: $!";
-}
+File::Util->make_dir($experiment, '--if-not-exists') or croak "Could not make directory: $!";
 
 # copy audio file and transcript to that folder
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
