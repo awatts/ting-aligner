@@ -7,6 +7,8 @@ use Carp;
 # author: Ting Qian <ting.qian@rochester.edu>
 # date: 08/20/2009
 # last update: 09/27/2009
+# modified by: Andrew Watts <awatts@bcs.rochester.edu>
+# modifed date: 2009-10-30
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -22,8 +24,7 @@ my $manual_end = shift @ARGV;
 # parameter: name of wave file
 # return: length in seconds, to 1/100th
 sub get_wave_length {
-    my $wave_file = "";
-    ($wave_file) = @_;
+    my ($wave_file) = @_;
     my $wav = Audio::Wav->new;
     my $read = $wav -> read($wave_file);
     my $length = $read -> length_seconds();
@@ -37,13 +38,14 @@ sub get_wave_length {
 sub clean_transcript {
     my ($transcript_fn) = @_;
     my @new_transcript_text;
-    open TRANSCRIPT_FP, $transcript_fn;
-    while (<TRANSCRIPT_FP>) {
+    open (my $transcript_fp, '<' ,$transcript_fn) or croak "Cannot open $transcript_fn\n";
+    while (<$transcript_fp>) {
 		chomp;
 		$_ =~ s/@\S+//igx;
 		$_ =~ s/\///gx;
 		push @new_transcript_text, $_;
     }
+	close $transcript_fp;
     return \@new_transcript_text;
 }
 
@@ -54,11 +56,12 @@ sub clean_transcript {
 sub write_to_file {
     my ($arr_ref, $output_fn) = @_;
     print @$arr_ref;
-    open OUTPUT_FP, ">$output_fn";
+    open (my $output_fp, '>', $output_fn) or croak "Cannot open $output_fn\n";
     foreach my $line (@$arr_ref) {
-		print OUTPUT_FP "$line\n";
+		print $output_fp "$line\n";
     }
-    close OUTPUT_FP;
+    close $output_fp;
+	return;
 }
 
 unless (defined $audio_fn && defined $text_fn) {
@@ -125,9 +128,9 @@ if (defined $manual_end) {
 } else {
     # get the length of audio file
     # write control file
-    open CTL, ">ctl";
-    print CTL "./\t0\t$length\tutt1\n";
-    close CTL;
+    open (my $ctl, ">", "ctl") or croak;
+    print $ctl "./\t0\t$length\tutt1\n";
+    close $ctl;
 }
 
 # align sound and transcript

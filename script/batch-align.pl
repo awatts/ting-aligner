@@ -1,10 +1,15 @@
 #!/usr/bin/perl -w
 use strict;
 use warnings;
+use Carp;
+
+use File::Temp;
 
 # batch-align.pl
 # author: Ting Qian <tqian@bcs.rochester.edu>
 # date: 9/29/2009
+# modified by: Andrew Watts <awatts@bcs.rochester.edu>
+# modifed date: 2009-10-30
 
 # usage: batch-align INDEX_TABLE_FILE
 
@@ -15,7 +20,7 @@ unless (defined $idx_fn && @ARGV == 0) {
     die "Usage: batch-align INDEX_TABLE_FILE\n";
 }
 unless (-e $idx_fn) {
-    die "Cannot open index table. Check file name?"
+    croak "Cannot open index table. Check file name?"
 }
 
 
@@ -28,20 +33,20 @@ unless (-e $idx_fn) {
 # index table file should have the following structure
 # subjectID.wav[TAB]TRANSCRIPT TEXT
 # NOTE: THRER MUST BE NO TAB DELIMITERS INSIDE TRANSCRIPT TEXT
-open IDX_FP, $idx_fn;
-while (<IDX_FP>) {
+open (my $idx_fp, '<', $idx_fn) or croak "Couldn't open file: $!";
+while (<$idx_fp>) {
     chomp;
-    my @data = split(/\t/, $_);
+    my @data = split(/\t/x, $_);
     my $audio_fn = $data[0];
     my $text_transcript = $data[1];
-    
-    open TEMP_TRS, ">_temp_transcript.txt";
-    print TEMP_TRS $text_transcript;
-    close TEMP_TRS;
 
-    system("align.pl $audio_fn _temp_transcript.txt");
+    my $temp_trs = File::Temp->new(SUFFIX => '.txt');
+    print $temp_trs $text_transcript;
+
+    my $temp_fn = $temp_trs->filename;
+    system("align.pl $audio_fn $temp_fn");
 }
-close IDX_FP;
+close $idx_fp;
 
-system("rm _temp_transcript.txt");
+# this should be done with an unlink. check how to glob
 system("rm _temp*.cleaned");
