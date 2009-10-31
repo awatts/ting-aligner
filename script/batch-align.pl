@@ -45,8 +45,6 @@ while (<$idx_fp>) {
 
     my $temp_fn = $temp_trs->filename;
     system("align.pl $audio_fn $temp_fn");
+    unlink "${temp_fn}.cleaned";
 }
 close $idx_fp;
-
-# this should be done with an unlink. check how to glob
-system("rm _temp*.cleaned");
