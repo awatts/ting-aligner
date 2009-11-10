@@ -14,6 +14,9 @@ our $VERSION = 0.001;
 # Based almost entirely on the make-anvil-annotation.pl script written by
 # various people in the CS department at the University of Rochester
 #
+# Rewritten into module form and cleaned up to not make Perl::Critic sob
+# too much by Andrew Watts
+#
 #- makes an anvil annotation xml track from ctl, outsent, wdseg, and phseg
 #
 
