@@ -32,7 +32,6 @@ sub new {
     my $self = {@_};
     bless ($self, $class);
     return $self;
-    print STDERR "Hey, this is making a new thingy\n";
 }
 
 sub addInterval {
