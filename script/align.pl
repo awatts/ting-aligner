@@ -16,10 +16,9 @@ use Audio::Wav;
 use File::Copy;
 use File::Spec;
 use File::Util;
+use File::Temp;
 
-my $audio_fn = shift @ARGV;
-my $text_fn = shift @ARGV;
-my $manual_end = shift @ARGV;
+my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
 # subroutine to get the length of a wave file
 # parameter: name of wave file
@@ -77,7 +76,8 @@ unless(-e $text_fn) {
 #unless (-e '${ALIGNMENT_HOME}/') { die "Cannot find aligning scripts.\n";}
 
 # pre-process transcript text
-write_to_file(clean_transcript($text_fn), "${text_fn}.cleaned");
+my $cleaned_fp = File::Temp->new(SUFFIX => '.cleaned');
+write_to_file(clean_transcript($text_fn), $cleaned_fp->filename);
 
 # get the length of the audio file
 # this must be done at the beginning to

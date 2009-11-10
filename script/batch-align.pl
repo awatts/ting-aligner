@@ -45,6 +45,5 @@ while (<$idx_fp>) {
 
     my $temp_fn = $temp_trs->filename;
     system("align.pl $audio_fn $temp_fn");
-    unlink "${temp_fn}.cleaned";
 }
 close $idx_fp;
