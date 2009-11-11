@@ -18,6 +18,11 @@ use File::Spec;
 use File::Util;
 use File::Temp;
 
+# we have a few modules that aren't necessarily ready to be installed in
+# the normal directories, so for now we'll keep them locally
+use lib '/p/hlp/tools/aligner/modules';
+use Annotate::Anvil;
+
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
 # subroutine to get the length of a wave file
@@ -142,4 +147,5 @@ if (defined $manual_end) {
 system("align.sh");
 
 # generate XML output
-system("make-anvil-annotation.pl");
+my $annotation = Annotate::Anvil->new;
+$annotation->writeAlignment;

@@ -26,3 +26,13 @@ A file named "annotation.anvil" records the results in an XML format (viewable
 through firefox and etc).
 
 Should any problem occur, please let Ting know (ting.qian@rochester.edu).
+
+Required Perl Modules
+---------------------
+Audio::Wav
+File::Copy
+File::Spec
+File::Util
+File::Temp
+IO::File
+XML::Writer

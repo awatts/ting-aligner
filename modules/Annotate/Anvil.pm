@@ -8,6 +8,8 @@ use Carp;
 use XML::Writer;
 use IO::File;
 
+use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
+
 use base qw(Exporter);
 our @EXPORT_OK = qw(writeAlignment);
 our %EXPORT_TAGS = ( all => [ qw(writeAlignment) ] );
@@ -156,17 +158,20 @@ sub processCtl {
 sub writeAnvilAnnotation {
     # output anvil annotation xml format
 
-    my $anvil = IO::File->new("anvil.xml", ">") or croak "Can't open annotation.anvil: $!\n";
-    my $writer = XML::Writer->new(OUTPUT => $anvil, NEWLINES => 1, ENCODING => 'us-ascii');
+    my $specification = "../../specification19.xml";
+    my $video = "video.avi";
+
+    my $anvil = IO::File->new("annotation.anvil", ">") or croak "Can't open annotation.anvil: $!\n";
+    my $writer = XML::Writer->new(OUTPUT => $anvil, DATA_MODE => 1, DATA_INDENT => 4);
 
     # header (I have no idea if the encoding is right)
     # TODO: get the video name from the parent script
     # TODO: get the specification file from the parent script
-    $writer->xmlDecl("ISO-8859-1");
+    $writer->xmlDecl("UTF-8");
     $writer->startTag('annotation');
     $writer->startTag('head');
-    $writer->emptyTag('specification', 'src' => "../../specification19.xml");
-    $writer->emptyTag('video', 'src' => "video.avi");
+    $writer->emptyTag('specification', 'src' => $specification);
+    $writer->emptyTag('video', 'src' => $video);
     $writer->startTag('info', 'key' => 'coder', 'type' => 'String');
     $writer->characters('Ting Qian\'s automatic speech aligner');
     $writer->endTag('info');
