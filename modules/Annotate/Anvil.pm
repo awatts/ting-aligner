@@ -5,6 +5,9 @@ use strict;
 use warnings;
 use Carp;
 
+use XML::Writer;
+use IO::File;
+
 use base qw(Exporter);
 our @EXPORT_OK = qw(writeAlignment);
 our %EXPORT_TAGS = ( all => [ qw(writeAlignment) ] );
@@ -56,7 +59,7 @@ sub addInterval {
     return;
 }
 
-sub doSomethingWithCtl {
+sub processCtl {
     open (my $ctl, "<", "ctl") or croak "Can't open ctl: $!\n";
     open (my $outsent, "<", "insent") or croak "Can't open ctl: $!\n";
 
@@ -153,63 +156,68 @@ sub doSomethingWithCtl {
 sub writeAnvilAnnotation {
     # output anvil annotation xml format
 
-    open (my $anvil, ">", "annotation.anvil") or croak "Can't open annotation.anvil: $!\n";
+    my $anvil = IO::File->new("anvil.xml", ">") or croak "Can't open annotation.anvil: $!\n";
+    my $writer = XML::Writer->new(OUTPUT => $anvil, NEWLINES => 1, ENCODING => 'us-ascii');
 
     # header (I have no idea if the encoding is right)
     # TODO: get the video name from the parent script
     # TODO: get the specification file from the parent script
-    print $anvil <<"EOH";
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <annotation>
-            <head>
-                <specification src="../../specification19.xml" />
-                <video src="video.avi" />
-                <info key="coder" type="String">
-                    Ting Qian's automatic speech aligner
-                </info>
-            </head>
+    $writer->xmlDecl("ISO-8859-1");
+    $writer->startTag('annotation');
+    $writer->startTag('head');
+    $writer->emptyTag('specification', 'src' => "../../specification19.xml");
+    $writer->emptyTag('video', 'src' => "video.avi");
+    $writer->startTag('info', 'key' => 'coder', 'type' => 'String');
+    $writer->characters('Ting Qian\'s automatic speech aligner');
+    $writer->endTag('info');
+    $writer->endTag('head');
 
-            <body>
-                <track name="Transcript.Word" type="primary">
-EOH
+    $writer->startTag('body');
 
+    # start of primary track
+    $writer->startTag('track', 'name' => 'Transcript.Word', 'type' => 'primary');
     my $j = 0;
     for my $i (0..$#wds) {
         unless ($wds[$i]->{text} =~ /^(<sil>|SIL|<s>|<\/s>|)$/x) {
-            print $anvil "      <el index=\"$j\" start=\"" . $wds[$i]->{xmin} . "\" end=\"" . $wds[$i]->{xmax} . "\">\n";
+            $writer->startTag('el', 'index' => $j, 'start' => $wds[$i]->{xmin}, 'end' => $wds[$i]->{xmax});
+            $writer->startTag('attribute', 'name' => 'utterance');
+            $writer->characters($wds[$i]->{text});
+            $writer->endTag('attribute');
+            $writer->endTag('el');
             $j++;
-            print $anvil "        <attribute name=\"utterance\">" . $wds[$i]->{text} . "</attribute>\n";
-            print $anvil "      </el>\n";
         }
     }
+    # end of primary track
+    $writer->endTag('track');
 
-    # end of primary track and start of second track
-    print $anvil "      </track>";
-    print $anvil "  <track name=\"Transcript.Phoneme\", type=\"primary\">";
-
+    # start of second track
+    $writer->startTag('track', 'name' => 'Transcript.Phoneme', 'type' => 'primary');
     $j = 0;
-
     for my $i (0..$#phs) {
         unless ($phs[$i]->{text} =~ /^(<sil>|SIL|<s>|<\/s>|)$/x) {
-            print $anvil "      <el index=\"$j\" start=\"" . $phs[$i]->{xmin} . "\" end=\"" . $phs[$i]->{xmax} . "\">\n";
+            $writer->startTag('el', 'index' => $j, 'start' => $phs[$i]->{xmin}, 'end' => $phs[$i]->{xmax});
+            $writer->startTag('attribute', name=> 'utterance');
+            $writer->characters($phs[$i]->{text});
+            $writer->endTag('attribute');
+            $writer->endTag('el');
             $j++;
-            print $anvil "        <attribute name=\"utterance\">" . $phs[$i]->{text} . "</attribute>\n";
-            print $anvil "      </el>\n";
         }
     }
+    # end of second track
+    $writer->endTag('track');
 
     # footer
-    print $anvil "           </track>";
-    print $anvil "      </body>";
-    print $anvil "</annotation>";
+    $writer->endTag('body');
+    $writer->endTag('annotation');
 
-    close $anvil;
+    $writer->end;
+    $anvil->close;
 
     return;
 }
 
 sub writeAlignment {
-    doSomethingWithCtl;
+    processCtl;
     writeAnvilAnnotation;
     return;
 }
