@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2009-10-30
+# modifed date: 2009-11-11
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -17,13 +17,90 @@ use File::Copy;
 use File::Spec;
 use File::Util;
 use File::Temp;
+use IO::File;
 
 # we have a few modules that aren't necessarily ready to be installed in
 # the normal directories, so for now we'll keep them locally
-use lib '/p/hlp/tools/aligner/modules';
+#use lib '/p/hlp/tools/aligner/modules';
+use lib '/Users/awatts/ting-aligner/modules/';
 use Annotate::Anvil;
+use Ctl;
+
+# TODO: make these ENV declarations less HLP Lab centric
+local $ENV{MPLAYER} = "mplayer";
+local $ENV{APLAY} = "afplay";
+
+# set this to "-x" if you're on a PPC Mac or other big-endian machine
+#local $ENV{SWAP_WORD_ORDER} = "-x";
+
+local $ENV{TOOLS_HOME} = "/p/hlp/tools";
+
+# aligner
+local $ENV{ALIGNMENT_HOME} = "$ENV{TOOLS_HOME}/aligner/tools/";
+local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
+local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/aligner/script";
+local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
+
+# sphinx 3
+local $ENV{S3_BIN} = "/usr/local/bin";
+local $ENV{S3_MODELS} ="$ENV{ALIGNER_DATA_HOME}/hub4_cd_continuous_8gau_1s_c_d_dd";
+local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
+
+# SphinxTrain
+local $ENV{WAVE2FEAT} = "$ENV{TOOLS_HOME}/SphinxTrain-1.0/bin.i686-apple-darwin9.7.0/wave2feat";
+
+local $ENV{PATH} = "/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNMENT_HOME}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
+
+# find utterance boundaries manually
+# based on make-ctl.pl
+# Press enter when the audio reaches the end of the currently displayed utterance.
+# Press Ctrl-D when done.
+sub find_manual_boundaries {
+	my $transcript = IO::File->new;
+	$transcript->open("transcript", "r") or croak "Can't open transcript: $!\n";
+	my $boundaries = IO::File->new;
+	$boundaries->open("boundaries", "r") or croak "Can't open boundaries: $!\n";
+
+	system("clear");
+
+    print "====================================\n";
+    print "Press ENTER when you hear a boundary\n";
+    print "Then press CTRL + D\n";
+    print "====================================\n";
+
+	unless (fork) {
+		`$ENV{APLAY} audio.wav 2>&1 >/dev/null`;
+	} else {
+		my $start = time;
+
+		my $line = <$transcript>;
+		print $line;
+
+		while (<>) {
+			print $boundaries int((time - $start)*100) . "\n";
+			$line = <$transcript>;
+			print $line;
+		}
+	}
+	$transcript->close;
+	$boundaries->close;
+
+	return;
+}
+
+# do initial per-segment processing of wav audio
+# based on process-audio.pl
+sub process_audio {
+	my $WAVE2FEAT = $ENV{WAVE2FEAT};
+	my $S3EP = "$ENV{S3_BIN}/sphinx3_ep";
+	my $S3EP_MODELS = $ENV{S3EP_MODELS};
+
+	system("$WAVE2FEAT -i audio.wav -o mfc -mswav yes -seed 2");
+	system("$S3EP -input mfc -mean $S3EP_MODELS/means -mixw $S3EP_MODELS/mixture_weights -var $S3EP_MODELS/variances >ep");
+	return;
+}
 
 # subroutine to get the length of a wave file
 # parameter: name of wave file
@@ -113,34 +190,22 @@ chdir($experiment) ||
 
 system("get-transcript-vocab.sh");
 system('subdic -var -ood ood-vocab.txt vocab.txt <${ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic >vocab.dic');
-system("process-audio.pl");
+process_audio;
 
 if (defined $manual_end) {
+	# wait for user to define boundaries
+	find_manual_boundaries;
 
-# wait for user to define boundaries
-    system("clear");
-
-    print "====================================\n";
-    print "Press ENTER when you hear a boundary\n";
-    print "Then press CTRL + D\n";
-    print "====================================\n";
-
-    my $pid = fork();
-    if ($pid == -1) {
-		croak;
-    } elsif ($pid == 0) {
-		exec 'find-manual-boundaries.pl';
-    }
-    while (wait() != -1) {}
-
-# generate control file
-    system("make-ctl.pl");
+	# generate control file
+	my $ctl = Ctl->new;
+	$ctl->write_control_file;
 } else {
     # get the length of audio file
     # write control file
-    open (my $ctl, ">", "ctl") or croak;
+	my $ctl = IO::File->new;
+    $ctl->open("ctl", "w") or croak;
     print $ctl "./\t0\t$length\tutt1\n";
-    close $ctl;
+    $ctl->close;
 }
 
 # align sound and transcript

@@ -1,9 +1,10 @@
 package Ctl;
-require Exporter;
 
 use strict;
 use warnings;
 use Carp;
+
+use IO::File;
 
 use base qw(Exporter);
 our @EXPORT_OK = qw(make_ctl);
@@ -21,15 +22,24 @@ our $VERSION = 0.001;
 # this is how much later ep can be than boundaries
 my $epsilon = 75;
 
+sub new {
+    my $invocant = shift;
+    my $class = ref($invocant) || $invocant;
+    my $self = {@_};
+    bless ($self, $class);
+    return $self;
+}
+
 # load manual boundaries
 sub load_manual_boundaries {
 	my @boundaries;
-	open (my $boundfile, "<", "boundaries") or croak "Can't open boundaries file $!\n";
+	my $boundfile = IO::File->new;
+	$boundfile->open("boundaries", "r") or croak "Can't open boundaries file $!\n";
 	while(<$boundfile>) {
 		chomp;
 		push @boundaries, $_;
 	}
-	close $boundfile;
+	$boundfile->close;
 
 	return @boundaries;
 }
@@ -37,7 +47,8 @@ sub load_manual_boundaries {
 # load automatic endpoints
 sub load_automatic_endpoints {
 	my @intervals = ();
-	open (my $ep, "<", "ep") or croak "Can't open ep: $!\n";
+	my $ep = IO::File->new;
+	$ep->open("ep", "r") or croak "Can't open ep: $!\n";
 	while (<$ep>) {
 		my ($start, $end);
 	    if (/^Utt_Start#\d+, Leader: ([\d\.]+),/x) {
@@ -49,7 +60,7 @@ sub load_automatic_endpoints {
 			push @intervals, {start=>$start, end=>$end};
 	    }
 	}
-	close $ep;
+	$ep->close;
 	return @intervals;
 }
 
@@ -100,7 +111,8 @@ sub write_control_file {
 	my @intervals = load_automatic_endpoints;
 	my @control = find_control_intervals(@boundaries, @intervals);
 
-	open (my $ctl, ">", "ctl") or croak "Can't open ctl: $!\n";
+	my $ctl = IO::File->new;
+	$ctl->open("ctl", "w") or croak "Can't open ctl: $!\n";
 	for my $line (@control) {
 		if ($line->{start} == undef) {
 			$line->{start} = 0;
@@ -110,7 +122,7 @@ sub write_control_file {
 		$line->{end} . ' ' .
 		$line->{uttid} . "\n";
 	}
-	close $ctl;
+	$ctl->close;
 	return;
 }
 
