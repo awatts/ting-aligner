@@ -6,7 +6,9 @@ use Carp;
 
 use XML::Writer;
 use IO::File;
-use Date::Simple qw/date today/;
+use Date::Simple qw(date today);
+
+use Ctl;
 
 use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
 
@@ -25,15 +27,6 @@ our $VERSION = 0.001;
 #- makes an anvil annotation xml track from ctl, outsent, wdseg, and phseg
 #
 
-my $framesPerSecond = 100;
-my $secondsPerFrame = 1 / $framesPerSecond;
-my $epsilon = $secondsPerFrame / 100; #stupid floating point error
-
-my @utts = ();
-my @wds = ();
-my @phs = ();
-my $xmax = 0;
-
 sub new {
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
@@ -42,126 +35,13 @@ sub new {
     return $self;
 }
 
-sub addInterval {
-    my ($array, $interval) = @_;
-    #  print STDERR "adding interval " . $interval->{text} . " to $array\n";
-    if (@$array > 0) {
-        my $diff = $interval->{xmin} - $array->[-1]->{xmax};
-        if ($diff > $secondsPerFrame + $epsilon) {
-            push @$array, { xmin => $array->[-1]->{xmax}, xmax => $interval->{xmin}, text => ""};
-        } elsif ($diff > 0) {
-            $array->[-1]->{xmax} = $interval->{xmin};
-        }
-    } elsif ($interval->{xmin} > 0) {
-        push @$array, { xmin => 0, xmax => $interval->{xmin}, text => ""};
-    }
-    push @$array, $interval;
-    $xmax = $interval->{xmax} if ($interval->{xmax} > $xmax);
-
-    return;
-}
-
-sub processCtl {
-    my $ctl = IO::File->new;
-    my $outsent = IO::File->new;
-    $ctl->open("ctl", "r") or croak "Can't open ctl: $!\n";
-    $outsent->open("insent", "r") or croak "Can't open ctl: $!\n";
-
-    while (defined(my $ctlLine = <$ctl>) and defined(my $outsentLine = <$outsent>)) {
-        chomp $ctlLine;
-        chomp $outsentLine;
-
-        my ($startFrame, $endFrame, $ctlUttID, $outsentUttID);
-
-        if ($ctlLine =~ /^\s*\S+\s+(\d+)\s+(\d+)\s+(\S+)\s*$/x) {
-            ($startFrame, $endFrame, $ctlUttID) = ($1,$2,$3);
-        } else {
-            croak "invalid ctl line: $ctlLine\n";
-        }
-
-        if ($outsentLine =~ /\(([^\)]+)\)$/x) {
-            $outsentUttID = $1;
-        } else {
-        croak "invalid outsent line: $outsentLine\n"
-        }
-
-        croak "utt id mismatch between ctl ($ctlUttID) and outsent ($outsentUttID)\n" unless ($ctlUttID eq $outsentUttID);
-
-        $outsentLine =~ s/\([^\)]+\)$//x;
-
-        # create utterance interval
-        addInterval(\@utts, {
-                xmin => $startFrame / $framesPerSecond,
-                xmax => $endFrame / $framesPerSecond,
-                text => $outsentLine
-            }
-        );
-
-        # get word intervals in utterance
-        my $wdseg = IO::File->new;
-        if ($wdseg->open("wdseg/$ctlUttID.wdseg", "r")) {
-            while (my $line = <$wdseg>) {
-                chomp $line;
-                my $word;
-                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(?:-)?\d+\s+(\S+)\s*$/x) {
-                    ($startFrame, $endFrame, $word) = ($1,$2,$3);
-                    $word =~ s/\([^\)]+\)$//x;
-                    addInterval(\@wds, {
-                        xmin => $startFrame / $framesPerSecond + $utts[-1]->{xmin},
-                        xmax => $endFrame / $framesPerSecond + $utts[-1]->{xmin},
-                        text => $word
-                        }
-                    );
-                }
-            }
-            $wdseg->close;
-        } else {
-            print STDERR "warning: couldn't open wdseg/$ctlUttID.wdseg, using utt as word\n";
-            addInterval(\@wds, {
-                xmin => $startFrame / $framesPerSecond,
-                xmax => $endFrame / $framesPerSecond,
-                text => $outsentLine
-                }
-            );
-        }
-
-        # get phoneme intervals in utterance
-        my $phseg = IO::File->new;
-        if ($phseg->open("phseg/$ctlUttID.phseg", "r")) {
-            while (my $line = <$phseg>) {
-                chomp $line;
-                my $phone;
-                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(?:-)?\d+\s+(\S+).*$/x) {
-                    ($startFrame, $endFrame, $phone) = ($1,$2,$3);
-                    $phone =~ s/\([^\)]+\)$//x;
-                    addInterval(\@phs, {
-                        xmin => $startFrame / $framesPerSecond + $utts[-1]->{xmin},
-                        xmax => $endFrame / $framesPerSecond + $utts[-1]->{xmin},
-                        text => $phone
-                        }
-                    );
-                }
-            }
-            $phseg->close;
-        } else {
-            carp "warning: couldn't open phseg/$ctlUttID.phseg, using utt as word\n";
-            addInterval(\@phs, {
-                xmin => $startFrame / $framesPerSecond,
-                xmax => $endFrame / $framesPerSecond,
-                text => $outsentLine
-                }
-            );
-        }
-    }
-
-    $ctl->close;
-    $outsent->close;
-    return;
-}
-
-
 sub writeAnvilAnnotation {
     # output anvil annotation xml format
+
+    my ($uttsref, $wdsref, $phsref) = @_;
+    my @utts = @$uttsref;
+    my @wds = @$wdsref;
+    my @phs = @$phsref;
 
     my $specification = "../../specification19.xml";
     my $video = "video.avi";
@@ -227,6 +107,13 @@ sub writeAnvilAnnotation {
 }
 
 sub writeTranscriberAnnotation {
+    # output Transcriber annotation xml format
+
+    my ($uttsref, $wdsref, $phsref) = @_;
+    my @utts = @$uttsref;
+    my @wds = @$wdsref;
+    my @phs = @$phsref;
+
     my $trs = IO::File->new("annotation.trs", ">") or croak "Can't open annotation.trs: $!\n";
     my $writer = XML::Writer->new(OUTPUT => $trs, DATA_MODE => 1, UNSAFE => 1, DATA_INDENT => 4);
 
@@ -278,9 +165,14 @@ sub writeTranscriberAnnotation {
 }
 
 sub writeAlignment {
-    processCtl;
-    writeAnvilAnnotation;
-    #writeTranscriberAnnotation;
+    my $ctl = Ctl->new;
+    my ($uttsref, $wdsref, $phsref)= $ctl->read_control_file;
+    my @utts = @$uttsref;
+    my @wds = @$wdsref;
+    my @phs = @$phsref;
+
+    writeAnvilAnnotation(\@utts, \@wds, \@phs);
+    #writeTranscriberAnnotation(\@utts, \@wds, \@phs);
     return;
 }
 

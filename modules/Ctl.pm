@@ -7,8 +7,8 @@ use Carp;
 use IO::File;
 
 use base qw(Exporter);
-our @EXPORT_OK = qw(make_ctl);
-our %EXPORT_TAGS = ( all => [ qw(make_ctl) ] );
+our @EXPORT_OK = qw(write_control_file read_control_file);
+our %EXPORT_TAGS = ( all => [ qw(write_control_file read_control_file) ] );
 our $VERSION = 0.001;
 
 #
@@ -22,12 +22,137 @@ our $VERSION = 0.001;
 # this is how much later ep can be than boundaries
 my $epsilon = 75;
 
+my $framesPerSecond = 100;
+
 sub new {
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
     my $self = {@_};
     bless ($self, $class);
     return $self;
+}
+
+sub addInterval {
+    my ($array, $interval) = @_;
+    my $xmax = 0;
+    my $secondsPerFrame = 1 / $framesPerSecond;
+    my $eps = $secondsPerFrame / 100; #stupid floating point error
+
+    if (@$array > 0) {
+        my $diff = $interval->{xmin} - $array->[-1]->{xmax};
+        if ($diff > $secondsPerFrame + $eps) {
+            push @$array, { xmin => $array->[-1]->{xmax}, xmax => $interval->{xmin}, text => ""};
+        } elsif ($diff > 0) {
+            $array->[-1]->{xmax} = $interval->{xmin};
+        }
+    } elsif ($interval->{xmin} > 0) {
+        push @$array, { xmin => 0, xmax => $interval->{xmin}, text => ""};
+    }
+    push @$array, $interval;
+    $xmax = $interval->{xmax} if ($interval->{xmax} > $xmax);
+
+    return;
+}
+
+sub read_control_file {
+    my $ctl = IO::File->new;
+    my $outsent = IO::File->new;
+    $ctl->open("ctl", "r") or croak "Can't open ctl: $!\n";
+    $outsent->open("insent", "r") or croak "Can't open ctl: $!\n";
+
+    my (@utts, @wds, @phs);
+
+    while (defined(my $ctlLine = <$ctl>) and defined(my $outsentLine = <$outsent>)) {
+        chomp $ctlLine;
+        chomp $outsentLine;
+
+        my ($startFrame, $endFrame, $ctlUttID, $outsentUttID);
+
+        if ($ctlLine =~ /^\s*\S+\s+(\d+)\s+(\d+)\s+(\S+)\s*$/x) {
+            ($startFrame, $endFrame, $ctlUttID) = ($1,$2,$3);
+        } else {
+            croak "invalid ctl line: $ctlLine\n";
+        }
+
+        if ($outsentLine =~ /\(([^\)]+)\)$/x) {
+            $outsentUttID = $1;
+        } else {
+           croak "invalid outsent line: $outsentLine\n";
+        }
+
+        croak "utt id mismatch between ctl ($ctlUttID) and outsent ($outsentUttID)\n" unless ($ctlUttID eq $outsentUttID);
+
+        $outsentLine =~ s/\([^\)]+\)$//x;
+
+        # create utterance interval
+        addInterval(\@utts, {
+                xmin => $startFrame / $framesPerSecond,
+                xmax => $endFrame / $framesPerSecond,
+                text => $outsentLine
+            }
+        );
+
+        # get word intervals in utterance
+        my $wdseg = IO::File->new;
+        if ($wdseg->open("wdseg/$ctlUttID.wdseg", "r")) {
+            while (my $line = <$wdseg>) {
+                chomp $line;
+                my $word;
+                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(?:-)?\d+\s+(\S+)\s*$/x) {
+                    ($startFrame, $endFrame, $word) = ($1,$2,$3);
+                    $word =~ s/\([^\)]+\)$//x;
+                    addInterval(\@wds, {
+                        xmin => $startFrame / $framesPerSecond + $utts[-1]->{xmin},
+                        xmax => $endFrame / $framesPerSecond + $utts[-1]->{xmin},
+                        text => $word
+                        }
+                    );
+                }
+            }
+            $wdseg->close;
+        } else {
+            print STDERR "warning: couldn't open wdseg/$ctlUttID.wdseg, using utt as word\n";
+            addInterval(\@wds, {
+                xmin => $startFrame / $framesPerSecond,
+                xmax => $endFrame / $framesPerSecond,
+                text => $outsentLine
+                }
+            );
+        }
+
+        # get phoneme intervals in utterance
+        my $phseg = IO::File->new;
+        if ($phseg->open("phseg/$ctlUttID.phseg", "r")) {
+            while (my $line = <$phseg>) {
+                chomp $line;
+                my $phone;
+                if ($line =~ /^\s*(\d+)\s+(\d+)\s+(?:-)?\d+\s+(\S+).*$/x) {
+                    ($startFrame, $endFrame, $phone) = ($1,$2,$3);
+                    $phone =~ s/\([^\)]+\)$//x;
+                    addInterval(\@phs, {
+                        xmin => $startFrame / $framesPerSecond + $utts[-1]->{xmin},
+                        xmax => $endFrame / $framesPerSecond + $utts[-1]->{xmin},
+                        text => $phone
+                        }
+                    );
+                }
+            }
+            $phseg->close;
+        } else {
+            carp "warning: couldn't open phseg/$ctlUttID.phseg, using utt as word\n";
+            addInterval(\@phs, {
+                xmin => $startFrame / $framesPerSecond,
+                xmax => $endFrame / $framesPerSecond,
+                text => $outsentLine
+                }
+            );
+        }
+    }
+
+    $ctl->close;
+    $outsent->close;
+
+    return (\@utts, \@wds, \@phs);
 }
 
 # load manual boundaries

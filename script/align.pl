@@ -49,7 +49,7 @@ local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
 # SphinxTrain
 local $ENV{WAVE2FEAT} = "$ENV{TOOLS_HOME}/SphinxTrain-1.0/bin.i686-apple-darwin9.7.0/wave2feat";
 
-local $ENV{PATH} = "/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNMENT_HOME}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
+local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNMENT_HOME}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
