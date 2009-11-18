@@ -37,3 +37,4 @@ File::Temp
 IO::File
 XML::Writer
 Date::Simple
+Array::Unique

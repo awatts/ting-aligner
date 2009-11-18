@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2009-11-11
+# modifed date: 2009-11-18
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -18,6 +18,7 @@ use File::Spec;
 use File::Util;
 use File::Temp;
 use IO::File;
+use Array::Unique;
 
 # we have a few modules that aren't necessarily ready to be installed in
 # the normal directories, so for now we'll keep them locally
@@ -36,9 +37,8 @@ local $ENV{APLAY} = "afplay";
 local $ENV{TOOLS_HOME} = "/p/hlp/tools";
 
 # aligner
-local $ENV{ALIGNMENT_HOME} = "$ENV{TOOLS_HOME}/aligner/tools/";
 local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
-local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/aligner/script";
+local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{HOME}/ting-aligner/script";
 local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
 
 # sphinx 3
@@ -49,7 +49,7 @@ local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
 # SphinxTrain
 local $ENV{WAVE2FEAT} = "$ENV{TOOLS_HOME}/SphinxTrain-1.0/bin.i686-apple-darwin9.7.0/wave2feat";
 
-local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNMENT_HOME}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
+local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
@@ -146,6 +146,155 @@ sub write_to_file {
 	return;
 }
 
+# makes .transcript suitable for sphinx3_align using a ctl file
+# based on resegment-transcript.pl
+sub resegment_transcript {
+
+	my $ctl = IO::File->new;
+	my $transcript = IO::File->new;
+	my $insent = IO::File->new;
+
+	$ctl->open('ctl', 'r') or croak "Can't open file ctl for reading: $!\n";
+	$transcript->open('transcript', 'r') or croak "Can't open file transcript for reading: $!\n";
+	$insent->open('insent', 'w') or croak "Can't open insent from writing: $!\n";
+
+	my $uttNum = 0;
+	while (my $ctlLine = <$ctl>) {
+		chomp $ctlLine;
+		if ($ctlLine =~ /utt(?:\d+-)?(\d+)$/ix) {
+			my $segName = $&; # $& is the whole match
+			my $endUttNum = $1;
+			my @words = ();
+			while ($uttNum < $endUttNum) {
+				my $transcriptLine = <$transcript>;
+				$uttNum++;
+				chomp $transcriptLine;
+				$transcriptLine =~ s/^.*?: //x;
+				$transcriptLine =~ s/\[PARTIAL (\w+).*?\]/$1/gx;
+				$transcriptLine =~ s/\<.*?\>//gx;
+				$transcriptLine =~ s/\[.*?\]//gx;
+				$transcriptLine = uc($transcriptLine);
+				push @words, @{[ $transcriptLine =~ /[\w'-]+/gx ]};
+			}
+			print $insent join(' ', @words) . " ($segName)\n";
+		}
+	}
+
+	$transcript->close;
+	$ctl->close;
+	return;
+}
+
+sub get_transcript_vocab {
+	my $transcript = IO::File->new;
+	my $vocab = IO::File->new;
+
+	$transcript->open('transcript', 'r') or croak "Can't open file transcript for reading: $!\n";
+	$vocab->open('vocab.txt', 'w') or croak "Can't open file vocab.txt for writing: $!\n";
+
+	my @wordlist = ();
+	tie @wordlist, 'Array::Unique';
+	while (my $transline = <$transcript>) {
+		while ($transline =~ /([\w'-]+)/gx) {
+			push @wordlist, uc($1);
+		}
+	}
+	@wordlist = sort(@wordlist);
+
+	foreach my $word (@wordlist) {
+		print $vocab "$word\n";
+	}
+
+	$vocab->close;
+	$transcript->close;
+	return;
+}
+
+
+# Description:
+# - input: a vocabulary and a dictionary
+# - output: the part of the dic including only words in the vocab
+#           (optional) save OOD words to file
+# Based on subdic by Lucian Galescu <galescu@cs.rochester.edu> <lgalescu@ihmc.us>
+sub subdic {
+	my %options = @_;
+
+	my $verbose = 0;
+	my $novar = 0;
+	my $ood_file = undef;
+	my $vocab_file = undef;
+	my $dict_file = undef;
+	my $subdic_file = undef;
+	my %vocab;
+
+	$novar = $options{'var'} if (defined $options{'var'});
+	$verbose = $options{'verbose'} if (defined $options{'verbose'});
+
+	$ood_file = $options{'ood'};
+	$vocab_file = $options{'vocab'};
+	$dict_file = $options{'dictionary'};
+	$subdic_file = $options{'subdic'};
+
+	my $voc = IO::File->new;
+	$voc->open($vocab_file, 'r') or croak "Can't open vocab file: $!\n";
+	while (my $word = <$voc>) {
+		next if $word =~ /^\#\#/x; # skip header
+		chomp $word;
+		$word =~ s/^\s*(\S+)\s*$/$1/x;
+		# eliminate tags
+		next if $word =~ /^</x;
+		$vocab{$word} = 1;
+	}
+	$voc->close;
+
+	if ($verbose) {
+		warn "Read ", scalar(keys %vocab), " words.\n";
+	}
+
+	my $dic = IO::File->new;
+	my $subdic = IO::File->new;
+	$dic->open($dict_file, 'r') or croak "Can't open dictionary: $dict_file $!\n";
+	$subdic->open($subdic_file, 'w') or croak "Can't open subdic: $subdic_file $!\n";
+	while (<$dic>) {
+
+		#
+		# This next statement was in the original, but made it skip every
+		# line. I'm commenting it out but leaving it in just in case. --alw
+		#
+		#next if /^##/x;
+
+		my $word;
+		if ($novar) {
+			if (m/^([^\s\(]+)/x) {
+				$word = $1;
+			}
+		} else {
+			if (m/^([^\s]+)\s/x) {
+				$word = $1;
+			}
+		}
+
+		if (defined $vocab{$word}) {
+			print $subdic $_;
+			$vocab{$word} = 2;
+		}
+	}
+	$subdic->close;
+	$dic->close;
+
+	if (defined $ood_file) {
+		my $ood = IO::File->new;
+		$ood->open($ood_file, 'w') or croak "Can't open file $ood_file:  $!\n";
+		foreach my $word (sort keys %vocab) {
+			if ($vocab{$word} != 2) {
+				print $ood $word, "\n";
+			}
+		}
+		$ood->close;
+	}
+	return;
+}
+
 unless (defined $audio_fn && defined $text_fn) {
     die "Usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT\n";
 }
@@ -155,7 +304,6 @@ unless(-e $audio_fn) {
 unless(-e $text_fn) {
     die "Cannot open transcript. Check file name?\n";
 }
-#unless (-e '${ALIGNMENT_HOME}/') { die "Cannot find aligning scripts.\n";}
 
 # pre-process transcript text
 my $cleaned_fp = File::Temp->new(SUFFIX => '.cleaned');
@@ -188,8 +336,14 @@ copy("${text_fn}.cleaned", "${experiment}/transcript") or croak "Copy failed: $!
 chdir($experiment) ||
     croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
 
-system("get-transcript-vocab.sh");
-system('subdic -var -ood ood-vocab.txt vocab.txt <${ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic >vocab.dic');
+get_transcript_vocab;
+#system('subdic -var -ood ood-vocab.txt vocab.txt <${ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic >vocab.dic');
+subdic('var' => 1,
+	   'ood' => 'ood-vocab.txt',
+	   'vocab' =>'vocab.txt',
+	   'dictionary' => "$ENV{ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic",
+	   'subdic' => 'vocab.dic'
+);
 process_audio;
 
 if (defined $manual_end) {
@@ -209,7 +363,27 @@ if (defined $manual_end) {
 }
 
 # align sound and transcript
-system("align.sh");
+resegment_transcript;
+mkdir 'phseg';
+mkdir 'wdseg';
+system("$ENV{S3_BIN}/sphinx3_align \\
+	   -agc none \\
+	   -ctl ctl \\
+	   -cepext mfc \\
+	   -dict vocab.dic \\
+	   -fdict $ENV{ALIGNER_DATA_HOME}/filler.dic \\
+	   -mdef $ENV{S3_MODELS}/hub4opensrc.6000.mdef \\
+	   -mean $ENV{S3_MODELS}/means \\
+	   -mixw $ENV{S3_MODELS}/mixture_weights \\
+	   -tmat $ENV{S3_MODELS}/transition_matrices \\
+	   -var $ENV{S3_MODELS}/variances \\
+	   -insent insent \\
+	   -logfn s3alignlog \\
+	   -outsent outsent \\
+	   -phsegdir phseg \\
+	   -wdsegdir wdseg \\
+	   -beam 1e-80"
+);
 
 # generate XML output
 my $annotation = Annotate::Anvil->new;

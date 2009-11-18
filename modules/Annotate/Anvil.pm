@@ -125,7 +125,7 @@ sub writeTranscriberAnnotation {
     $writer->startTag('Trans',
                       'scribe' => 'Ting Qian\'s automatic speech aligner',
                       'audio_filename' => 'audio.wav',
-                      'version_date' => $date->format("%y%m%d")); # find a way to generate today's date like this
+                      'version_date' => $date->format("%y%m%d"));
 
     $writer->startTag('Topics');
     $writer->emptyTag('Topic', 'id' => 'to1', 'desc' => 'topic#1');
