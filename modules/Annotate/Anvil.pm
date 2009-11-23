@@ -31,7 +31,7 @@ sub new {
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
     my $self = {@_};
-    bless ($self, $class);
+    bless $self, $class;
     return $self;
 }
 
@@ -43,16 +43,15 @@ sub writeAnvilAnnotation {
     my @wds = @$wdsref;
     my @phs = @$phsref;
 
-    my $specification = "../../specification19.xml";
-    my $video = "video.avi";
+    # TODO: get the video name from the parent script
+    # TODO: get the specification file from the parent script
+    my $specification = '/p/hlp/tools/aligner/ting-alginer.xml';
+    my $video = 'video.avi';
 
     my $anvil = IO::File->new("annotation.anvil", ">") or croak "Can't open annotation.anvil: $!\n";
     my $writer = XML::Writer->new(OUTPUT => $anvil, DATA_MODE => 1, DATA_INDENT => 4);
 
-    # header (I have no idea if the encoding is right)
-    # TODO: get the video name from the parent script
-    # TODO: get the specification file from the parent script
-    $writer->xmlDecl("UTF-8");
+    $writer->xmlDecl('UTF-8');
     $writer->startTag('annotation');
     $writer->startTag('head');
     $writer->emptyTag('specification', 'src' => $specification);
@@ -114,7 +113,7 @@ sub writeTranscriberAnnotation {
     my @wds = @$wdsref;
     my @phs = @$phsref;
 
-    my $trs = IO::File->new("annotation.trs", ">") or croak "Can't open annotation.trs: $!\n";
+    my $trs = IO::File->new('annotation.trs', 'w') or croak "Can't open annotation.trs: $!\n";
     my $writer = XML::Writer->new(OUTPUT => $trs, DATA_MODE => 1, UNSAFE => 1, DATA_INDENT => 4);
 
     my $date = today();

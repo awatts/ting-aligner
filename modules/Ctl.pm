@@ -28,7 +28,7 @@ sub new {
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
     my $self = {@_};
-    bless ($self, $class);
+    bless $self, $class;
     return $self;
 }
 
@@ -41,12 +41,12 @@ sub addInterval {
     if (@$array > 0) {
         my $diff = $interval->{xmin} - $array->[-1]->{xmax};
         if ($diff > $secondsPerFrame + $eps) {
-            push @$array, { xmin => $array->[-1]->{xmax}, xmax => $interval->{xmin}, text => ""};
+            push @$array, { xmin => $array->[-1]->{xmax}, xmax => $interval->{xmin}, text => ''};
         } elsif ($diff > 0) {
             $array->[-1]->{xmax} = $interval->{xmin};
         }
     } elsif ($interval->{xmin} > 0) {
-        push @$array, { xmin => 0, xmax => $interval->{xmin}, text => ""};
+        push @$array, { xmin => 0, xmax => $interval->{xmin}, text => ''};
     }
     push @$array, $interval;
     $xmax = $interval->{xmax} if ($interval->{xmax} > $xmax);
@@ -57,8 +57,8 @@ sub addInterval {
 sub read_control_file {
     my $ctl = IO::File->new;
     my $outsent = IO::File->new;
-    $ctl->open("ctl", "r") or croak "Can't open ctl: $!\n";
-    $outsent->open("insent", "r") or croak "Can't open ctl: $!\n";
+    $ctl->open('ctl', 'r') or croak "Can't open ctl: $!\n";
+    $outsent->open('insent', 'r') or croak "Can't open ctl: $!\n";
 
     my (@utts, @wds, @phs);
 
@@ -94,7 +94,7 @@ sub read_control_file {
 
         # get word intervals in utterance
         my $wdseg = IO::File->new;
-        if ($wdseg->open("wdseg/$ctlUttID.wdseg", "r")) {
+        if ($wdseg->open("wdseg/$ctlUttID.wdseg", 'r')) {
             while (my $line = <$wdseg>) {
                 chomp $line;
                 my $word;
@@ -122,7 +122,7 @@ sub read_control_file {
 
         # get phoneme intervals in utterance
         my $phseg = IO::File->new;
-        if ($phseg->open("phseg/$ctlUttID.phseg", "r")) {
+        if ($phseg->open("phseg/$ctlUttID.phseg", 'r')) {
             while (my $line = <$phseg>) {
                 chomp $line;
                 my $phone;
@@ -159,7 +159,7 @@ sub read_control_file {
 sub load_manual_boundaries {
 	my @boundaries;
 	my $boundfile = IO::File->new;
-	$boundfile->open("boundaries", "r") or croak "Can't open boundaries file $!\n";
+	$boundfile->open('boundaries', 'r') or croak "Can't open boundaries file $!\n";
 	while(<$boundfile>) {
 		chomp;
 		push @boundaries, $_;
@@ -173,7 +173,7 @@ sub load_manual_boundaries {
 sub load_automatic_endpoints {
 	my @intervals = ();
 	my $ep = IO::File->new;
-	$ep->open("ep", "r") or croak "Can't open ep: $!\n";
+	$ep->open('ep', 'r') or croak "Can't open ep: $!\n";
 	while (<$ep>) {
 		my ($start, $end);
 	    if (/^Utt_Start#\d+, Leader: ([\d\.]+),/x) {
@@ -237,7 +237,7 @@ sub write_control_file {
 	my @control = find_control_intervals(@boundaries, @intervals);
 
 	my $ctl = IO::File->new;
-	$ctl->open("ctl", "w") or croak "Can't open ctl: $!\n";
+	$ctl->open('ctl', 'w') or croak "Can't open ctl: $!\n";
 	for my $line (@control) {
 		if ($line->{start} == undef) {
 			$line->{start} = 0;

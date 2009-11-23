@@ -38,7 +38,7 @@ local $ENV{TOOLS_HOME} = "/p/hlp/tools";
 
 # aligner
 local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
-local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{HOME}/ting-aligner/script";
+local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/ting-aligner/script";
 local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
 
 # sphinx 3
@@ -120,14 +120,15 @@ sub get_wave_length {
 sub clean_transcript {
     my ($transcript_fn) = @_;
     my @new_transcript_text;
-    open (my $transcript_fp, '<' ,$transcript_fn) or croak "Cannot open $transcript_fn\n";
+	my $transcript_fp = IO::File->new;
+	$transcript_fp->open($transcript_fn, 'r') or croak "Cannot open $transcript_fn\n";
     while (<$transcript_fp>) {
 		chomp;
 		$_ =~ s/@\S+//igx;
 		$_ =~ s/\///gx;
 		push @new_transcript_text, $_;
     }
-	close $transcript_fp;
+	$transcript_fp->close;
     return \@new_transcript_text;
 }
 
@@ -138,11 +139,12 @@ sub clean_transcript {
 sub write_to_file {
     my ($arr_ref, $output_fn) = @_;
     print @$arr_ref;
-    open (my $output_fp, '>', $output_fn) or croak "Cannot open $output_fn\n";
+	my $output_fp = IO::File->new;
+	$output_fp->open($output_fn, 'w') or croak "Cannot open $output_fn\n";
     foreach my $line (@$arr_ref) {
 		print $output_fp "$line\n";
     }
-    close $output_fp;
+    $output_fp->close;
 	return;
 }
 
@@ -185,6 +187,8 @@ sub resegment_transcript {
 	return;
 }
 
+# based very loosly on get-transcript-vocab.sh, which has gone from a one-liner
+# to a cleaner, safer, but much longer function
 sub get_transcript_vocab {
 	my $transcript = IO::File->new;
 	my $vocab = IO::File->new;
@@ -357,7 +361,7 @@ if (defined $manual_end) {
     # get the length of audio file
     # write control file
 	my $ctl = IO::File->new;
-    $ctl->open("ctl", "w") or croak;
+    $ctl->open('ctl', 'w') or croak;
     print $ctl "./\t0\t$length\tutt1\n";
     $ctl->close;
 }
