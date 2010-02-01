@@ -38,7 +38,8 @@ local $ENV{TOOLS_HOME} = "/p/hlp/tools";
 
 # aligner
 local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
-local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/ting-aligner/script";
+#local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/ting-aligner/script";
+local $ENV{ALIGNER_SCRIPT_HOME} = "/Users/awatts/ting-aligner/script";
 local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
 
 # sphinx 3
@@ -310,7 +311,7 @@ unless(-e $text_fn) {
 }
 
 # pre-process transcript text
-my $cleaned_fp = File::Temp->new(SUFFIX => '.cleaned');
+my $cleaned_fp = File::Temp->new(SUFFIX => '.cleaned') or croak "Couldn't make temp file: $!";
 write_to_file(clean_transcript($text_fn), $cleaned_fp->filename);
 
 # get the length of the audio file
@@ -335,7 +336,8 @@ File::Util->make_dir($experiment, '--if-not-exists') or croak "Could not make di
 
 # copy audio file and transcript to that folder
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
-copy("${text_fn}.cleaned", "${experiment}/transcript") or croak "Copy failed: $!";
+#copy("${text_fn}.cleaned", "${experiment}/transcript") or croak "Copy failed: $!";
+copy($cleaned_fp->filename, "${experiment}/transcript") or croak "Copy failed: $!";
 
 chdir($experiment) ||
     croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
@@ -389,6 +391,10 @@ system("$ENV{S3_BIN}/sphinx3_align \\
 	   -beam 1e-80"
 );
 
+my %metadata = ('filename' => $audio_fn,
+				'participant' => 'AK',
+			 );
+
 # generate XML output
 my $annotation = Annotate::Anvil->new;
-$annotation->writeAlignment;
+$annotation->writeAlignment(%metadata);

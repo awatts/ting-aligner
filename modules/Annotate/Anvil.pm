@@ -6,14 +6,16 @@ use Carp;
 
 use XML::Writer;
 use IO::File;
-use Date::Simple qw(date today);
+use Date::Simple qw/date today/;
+use DateTime;
+use DateTime::Format::Strptime;
 
 use Ctl;
 
-use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
+use vars qw/$VERSION @ISA @EXPORT_OK %EXPORT_TAGS/;
 
-use base qw(Exporter);
-our @EXPORT_OK = qw(writeAlignment);
+use base qw/Exporter/;
+our @EXPORT_OK = qw/writeAlignment/;
 our %EXPORT_TAGS = ( all => [ qw(writeAlignment) ] );
 our $VERSION = 0.001;
 
@@ -163,15 +165,177 @@ sub writeTranscriberAnnotation {
     return;
 }
 
+
+sub writeElanAnnotation {
+    # output Elan annotation xml format
+
+    my ($uttsref, $wdsref, $phsref, $mdref) = @_;
+    my @utts = @$uttsref;
+    my @wds = @$wdsref;
+    my @phs = @$phsref;
+    my %metadata = %$mdref;
+
+    my $eaf = IO::File->new('annotation.eaf', 'w') or croak "Can't open annotation.eaf: $!\n";
+    my $writer = XML::Writer->new(OUTPUT => $eaf, DATA_MODE => 1, UNSAFE => 1, DATA_INDENT => 4);
+
+    my $formatter = DateTime::Format::Strptime->new(pattern=>'%F%z');
+    my $date = DateTime->now(time_zone => 'America/New_York', formatter => $formatter);
+
+    my $annotation_id = 1;
+    my @time_slots = ();
+    my @words = ();
+    my @phones = ();
+
+    for my $i (0..$#wds) {
+        unless ($wds[$i]->{text} =~ /^(<sil>|SIL|<s>|<\/s>|)$/x) {
+            push @time_slots, $wds[$i]->{xmin} * 1000;
+            push @time_slots, $wds[$i]->{xmax} * 1000;
+            push @words, $wds[$i]->{text};
+           # 'start' => $wds[$i]->{xmin}, 'end' => $wds[$i]->{xmax}
+        }
+    }
+
+    for my $i (0..$#phs) {
+        unless ($phs[$i]->{text} =~ /^(<sil>|SIL|<s>|<\/s>|)$/x) {
+            push @time_slots, $phs[$i]->{xmin} * 1000;
+            push @time_slots, $phs[$i]->{xmax} * 1000;
+            push @phones, $phs[$i]->{text};
+            # 'start' => $phs[$i]->{xmin}, 'end' => $phs[$i]->{xmax}
+        }
+    }
+
+    @time_slots = sort {$a <=> $b} @time_slots;
+
+    $writer->xmlDecl('UTF-8');
+
+    $writer->startTag('ANNOTATION_DOCUMENT',
+                      'AUTHOR' => 'Ting Automatic Aligner',
+                      'DATE' => $date->iso8601,
+                      'FORMAT' => '2.6',
+                      'VERSION' => '2.6',
+                      'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+                      'xsi:noNamespaceSchemaLocation' => 'http://www.mpi.nl/tools/elan/EAFv2.6.xsd'
+                    );
+
+    $writer->startTag('HEADER',
+                      'MEDIA_FILE' => '',
+                      'TIME_UNITS' => 'milliseconds'
+                      );
+    $writer->emptyTag('MEDIA_DESCRIPTOR',
+                      'MEDIA_URL' => 'file://' . $metadata{'filename'},
+                      'MIME_TYPE' => 'audio/x-wav',
+                      'RELATIVE_MEDIA_URL' => 'file:' . $metadata{'filename'}
+                      );
+    $writer->startTag('PROPERTY', 'NAME' => 'lastUsedAnnotationId');
+    $writer->characters($#words + $#phones + 2);
+    $writer->endTag('PROPERTY');
+    $writer->endTag('HEADER');
+
+    $writer->startTag('TIME_ORDER');
+    for my $i (0..$#time_slots) {
+        $writer->emptyTag('TIME_SLOT',
+                          'TIME_SLOT_ID' => 'ts' . ($i +1),
+                          'TIME_VALUE' => $time_slots[$i]
+                          );
+    }
+    $writer->endTag('TIME_ORDER');
+
+    $writer->startTag('TIER',
+                      'ANNOTATOR' => 'Auto',
+                      'DEFAULT_LOCALE' => 'en',
+                      'LINGUISTIC_TYPE_REF' => 'Word',
+                      'PARTICIPANT' => 'AK',
+                      'TIER_ID'=> 'Word'
+                      );
+    for my $i (0..$#words) {
+        $writer->startTag('ANNOTATION');
+        $writer->startTag('ALIGNABLE_ANNOTATION',
+                          'ANNOTATION_ID' => 'a' . ($annotation_id++),
+                          'TIME_SLOT_REF1' => 'ts' . 'XXX', #FIXME: get the refs
+                          'TIME_SLOT_REF2' => 'ts' . 'XXX'
+                          );
+        $writer->dataElement('ANNOTATION_VALUE', $words[$i]);
+        $writer->endTag('ALIGNABLE_ANNOTATION');
+        $writer->endTag('ANNOTATION');
+    }
+    $writer->endTag('TIER');
+
+    $writer->startTag('TIER',
+                      'ANNOTATOR' => 'Auto',
+                      'DEFAULT_LOCALE' => 'en',
+                      'LINGUISTIC_TYPE_REF' => 'Word',
+                      'PARTICIPANT' => 'AK',
+                      'TIER_ID'=> 'Word',
+                      );
+        for my $i (0..$#phones) {
+        $writer->startTag('ANNOTATION');
+        $writer->startTag('ALIGNABLE_ANNOTATION',
+                          'ANNOTATION_ID' => 'a' . ($annotation_id++),
+                          'TIME_SLOT_REF1' => 'ts' . 'XXX', #FIXME: get the refs
+                          'TIME_SLOT_REF2' => 'ts' . 'XXX'
+                          );
+        $writer->dataElement('ANNOTATION_VALUE', $phones[$i]);
+        $writer->endTag('ALIGNABLE_ANNOTATION');
+        $writer->endTag('ANNOTATION');
+    }
+    $writer->endTag('TIER');
+
+    $writer->emptyTag('LINGUISTIC_TYPE',
+                      'GRAPHIC_REFERENCES'=> 'false',
+                      'LINGUISTIC_TYPE_ID' => 'default-lt',
+                      'TIME_ALIGNABLE' => 'true'
+                      );
+    $writer->emptyTag('LINGUISTIC_TYPE',
+                      'GRAPHIC_REFERENCES' => 'false',
+                      'LINGUISTIC_TYPE_ID' => 'Word',
+                      'TIME_ALIGNABLE' => 'true'
+                      );
+    $writer->emptyTag('LINGUISTIC_TYPE',
+                      'GRAPHIC_REFERENCES' => 'false',
+                      'LINGUISTIC_TYPE_ID' => 'Phoneme',
+                      'TIME_ALIGNABLE' => 'true'
+                      );
+    $writer->emptyTag('LOCALE',
+                      'COUNTRY_CODE' => 'US',
+                      'LANGUAGE_CODE' => 'en'
+                     );
+    $writer->emptyTag('CONSTRAINT',
+                      'DESCRIPTION' => "Time subdivision of parent annotation's time interval, no time gaps allowed within this interval",
+                      'STEREOTYPE' => 'Time_Subdivision'
+                      );
+    $writer->emptyTag('CONSTRAINT',
+                      'DESCRIPTION' => "Symbolic subdivision of a parent annotation. Annotations refering to the same parent are ordered",
+                      'STEREOTYPE' => 'Symbolic_Subdivision'
+                      );
+    $writer->emptyTag('CONSTRAINT',
+                      'DESCRIPTION' => "1-1 association with a parent annotation",
+                      'STEREOTYPE' => 'Symbolic_Association'
+                      );
+    $writer->emptyTag('CONSTRAINT',
+                      'DESCRIPTION' => "Time alignable annotations within the parent annotation's time interval, gaps are allowed",
+                      'STEREOTYPE' => 'Included_In'
+                      );
+
+    $writer->endTag('ANNOTATION_DOCUMENT');
+
+    $writer->end;
+    $eaf->close;
+
+    return;
+
+}
+
 sub writeAlignment {
+    my ($metadata_ref) = shift;
     my $ctl = Ctl->new;
     my ($uttsref, $wdsref, $phsref)= $ctl->read_control_file;
     my @utts = @$uttsref;
     my @wds = @$wdsref;
     my @phs = @$phsref;
 
-    writeAnvilAnnotation(\@utts, \@wds, \@phs);
+    #writeAnvilAnnotation(\@utts, \@wds, \@phs);
     #writeTranscriberAnnotation(\@utts, \@wds, \@phs);
+    writeElanAnnotation(\@utts, \@wds, \@phs, $metadata_ref);
     return;
 }
 
