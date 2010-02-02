@@ -181,13 +181,15 @@ sub writeElanAnnotation {
     my @time_slots = ();
     my @words = ();
     my @phones = ();
+    my @tsids = ();
+    my @elems = ();
 
     for my $i (0..$#wds) {
         unless ($wds[$i]->{text} =~ /^(<sil>|SIL|<s>|<\/s>|)$/x) {
             push @time_slots, $wds[$i]->{xmin} * 1000;
             push @time_slots, $wds[$i]->{xmax} * 1000;
             push @words, $wds[$i]->{text};
-           # 'start' => $wds[$i]->{xmin}, 'end' => $wds[$i]->{xmax}
+            push @elems, $wds[$i];
         }
     }
 
@@ -196,11 +198,17 @@ sub writeElanAnnotation {
             push @time_slots, $phs[$i]->{xmin} * 1000;
             push @time_slots, $phs[$i]->{xmax} * 1000;
             push @phones, $phs[$i]->{text};
-            # 'start' => $phs[$i]->{xmin}, 'end' => $phs[$i]->{xmax}
+            push @elems, $phs[$i];
         }
     }
 
     @time_slots = sort {$a <=> $b} @time_slots;
+    for my $t (0..$#time_slots) {
+        my $ts = {'slot' => 'ts' . ($t+1),
+                  'time' => $time_slots[$t]
+                 };
+        push @tsids, $ts;
+    }
 
     $writer->xmlDecl('UTF-8');
 
@@ -244,11 +252,34 @@ sub writeElanAnnotation {
                       'TIER_ID'=> 'Word'
                       );
     for my $i (0..$#words) {
+        my $word = shift @elems;
+        my $start = $word->{xmin} * 1000;
+        my $end = $word->{xmax} * 1000;
+        my ($ts1,$ts2) = ('','');
+        my $j = 0;
+        foreach my $t (@tsids) {
+            print $tsids[$j] . "\n";
+            if ($t->{'time'} == $start) {
+                $ts1 = $t->{'slot'};
+                #delete $tsids[$j];
+                last;
+            }
+            $j++;
+        }
+        my $k = 0;
+        foreach my $t (@tsids) {
+            if ($t->{'time'} == $end) {
+                $ts2 = $t->{'slot'};
+                #delete $tsids[$k];
+                last;
+            }
+            $k++;
+        }
         $writer->startTag('ANNOTATION');
         $writer->startTag('ALIGNABLE_ANNOTATION',
                           'ANNOTATION_ID' => 'a' . ($annotation_id++),
-                          'TIME_SLOT_REF1' => 'ts' . 'XXX', #FIXME: get the refs
-                          'TIME_SLOT_REF2' => 'ts' . 'XXX'
+                          'TIME_SLOT_REF1' =>  $ts1,
+                          'TIME_SLOT_REF2' =>  $ts2
                           );
         $writer->dataElement('ANNOTATION_VALUE', $words[$i]);
         $writer->endTag('ALIGNABLE_ANNOTATION');
@@ -264,11 +295,29 @@ sub writeElanAnnotation {
                       'TIER_ID'=> 'Word',
                       );
         for my $i (0..$#phones) {
+            my $phone = shift @elems;
+            my $start = $phone->{xmin} * 1000;
+            my $end = $phone->{xmax} * 1000;
+            my ($ts1,$ts2) = ('','');
+            foreach my $t (@tsids) {
+                if ($t->{'time'} == $start) {
+                    $ts1 = $t->{'slot'};
+                    delete $tsids[$t];
+                    last;
+                }
+            }
+            foreach my $t (@tsids) {
+                if ($t->{'time'} == $end) {
+                    $ts2 = $t->{'slot'};
+                    delete $tsids[$t];
+                    last;
+                }
+            }
         $writer->startTag('ANNOTATION');
         $writer->startTag('ALIGNABLE_ANNOTATION',
                           'ANNOTATION_ID' => 'a' . ($annotation_id++),
-                          'TIME_SLOT_REF1' => 'ts' . 'XXX', #FIXME: get the refs
-                          'TIME_SLOT_REF2' => 'ts' . 'XXX'
+                          'TIME_SLOT_REF1' => $ts1,
+                          'TIME_SLOT_REF2' => $ts2
                           );
         $writer->dataElement('ANNOTATION_VALUE', $phones[$i]);
         $writer->endTag('ALIGNABLE_ANNOTATION');
