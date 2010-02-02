@@ -42,13 +42,10 @@ local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
 local $ENV{ALIGNER_SCRIPT_HOME} = "/Users/awatts/ting-aligner/script";
 local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
 
-# sphinx 3
+# sphinx 3 and SphinxTrain
 local $ENV{S3_BIN} = "/usr/local/bin";
 local $ENV{S3_MODELS} ="$ENV{ALIGNER_DATA_HOME}/hub4_cd_continuous_8gau_1s_c_d_dd";
 local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
-
-# SphinxTrain
-local $ENV{WAVE2FEAT} = "$ENV{TOOLS_HOME}/SphinxTrain-1.0/bin.i686-apple-darwin9.7.0/wave2feat";
 
 local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
 
@@ -94,7 +91,7 @@ sub find_manual_boundaries {
 # do initial per-segment processing of wav audio
 # based on process-audio.pl
 sub process_audio {
-	my $WAVE2FEAT = $ENV{WAVE2FEAT};
+	my $WAVE2FEAT = "$ENV{S3_BIN}/wave2feat";
 	my $S3EP = "$ENV{S3_BIN}/sphinx3_ep";
 	my $S3EP_MODELS = $ENV{S3EP_MODELS};
 
@@ -336,14 +333,13 @@ File::Util->make_dir($experiment, '--if-not-exists') or croak "Could not make di
 
 # copy audio file and transcript to that folder
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
-#copy("${text_fn}.cleaned", "${experiment}/transcript") or croak "Copy failed: $!";
 copy($cleaned_fp->filename, "${experiment}/transcript") or croak "Copy failed: $!";
 
 chdir($experiment) ||
     croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
 
 get_transcript_vocab;
-#system('subdic -var -ood ood-vocab.txt vocab.txt <${ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic >vocab.dic');
+
 subdic('var' => 1,
 	   'ood' => 'ood-vocab.txt',
 	   'vocab' =>'vocab.txt',
@@ -391,10 +387,7 @@ system("$ENV{S3_BIN}/sphinx3_align \\
 	   -beam 1e-80"
 );
 
-my %metadata = ('filename' => $audio_fn,
-				'participant' => 'AK',
-			 );
 
 # generate XML output
-my $annotation = Annotate::Anvil->new;
-$annotation->writeAlignment(%metadata);
+my $annotation = Annotate::Anvil->new();
+$annotation->writeAlignment($audio_fn, 'AK');

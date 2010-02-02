@@ -8,7 +8,6 @@ use XML::Writer;
 use IO::File;
 use Date::Simple qw/date today/;
 use DateTime;
-use DateTime::Format::Strptime;
 
 use Ctl;
 
@@ -16,7 +15,7 @@ use vars qw/$VERSION @ISA @EXPORT_OK %EXPORT_TAGS/;
 
 use base qw/Exporter/;
 our @EXPORT_OK = qw/writeAlignment/;
-our %EXPORT_TAGS = ( all => [ qw(writeAlignment) ] );
+our %EXPORT_TAGS = ( all => [ qw/writeAlignment/ ] );
 our $VERSION = 0.001;
 
 #
@@ -168,18 +167,15 @@ sub writeTranscriberAnnotation {
 
 sub writeElanAnnotation {
     # output Elan annotation xml format
-
-    my ($uttsref, $wdsref, $phsref, $mdref) = @_;
+    my ($uttsref, $wdsref, $phsref, $filename, $participant) = @_;
     my @utts = @$uttsref;
     my @wds = @$wdsref;
     my @phs = @$phsref;
-    my %metadata = %$mdref;
 
     my $eaf = IO::File->new('annotation.eaf', 'w') or croak "Can't open annotation.eaf: $!\n";
     my $writer = XML::Writer->new(OUTPUT => $eaf, DATA_MODE => 1, UNSAFE => 1, DATA_INDENT => 4);
 
-    my $formatter = DateTime::Format::Strptime->new(pattern=>'%F%z');
-    my $date = DateTime->now(time_zone => 'America/New_York', formatter => $formatter);
+    my $date = DateTime->now(time_zone => 'America/New_York');
 
     my $annotation_id = 1;
     my @time_slots = ();
@@ -210,7 +206,7 @@ sub writeElanAnnotation {
 
     $writer->startTag('ANNOTATION_DOCUMENT',
                       'AUTHOR' => 'Ting Automatic Aligner',
-                      'DATE' => $date->iso8601,
+                      'DATE' => $date->strftime('%FT%R%z'),
                       'FORMAT' => '2.6',
                       'VERSION' => '2.6',
                       'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
@@ -222,9 +218,9 @@ sub writeElanAnnotation {
                       'TIME_UNITS' => 'milliseconds'
                       );
     $writer->emptyTag('MEDIA_DESCRIPTOR',
-                      'MEDIA_URL' => 'file://' . $metadata{'filename'},
+                      'MEDIA_URL' => 'file://' . $filename,
                       'MIME_TYPE' => 'audio/x-wav',
-                      'RELATIVE_MEDIA_URL' => 'file:' . $metadata{'filename'}
+                      'RELATIVE_MEDIA_URL' => 'file:' . $filename
                       );
     $writer->startTag('PROPERTY', 'NAME' => 'lastUsedAnnotationId');
     $writer->characters($#words + $#phones + 2);
@@ -244,7 +240,7 @@ sub writeElanAnnotation {
                       'ANNOTATOR' => 'Auto',
                       'DEFAULT_LOCALE' => 'en',
                       'LINGUISTIC_TYPE_REF' => 'Word',
-                      'PARTICIPANT' => 'AK',
+                      'PARTICIPANT' => $participant,
                       'TIER_ID'=> 'Word'
                       );
     for my $i (0..$#words) {
@@ -326,7 +322,7 @@ sub writeElanAnnotation {
 }
 
 sub writeAlignment {
-    my ($metadata_ref) = shift;
+    my ($self, $filename, $participant) = @_;
     my $ctl = Ctl->new;
     my ($uttsref, $wdsref, $phsref)= $ctl->read_control_file;
     my @utts = @$uttsref;
@@ -335,7 +331,7 @@ sub writeAlignment {
 
     #writeAnvilAnnotation(\@utts, \@wds, \@phs);
     #writeTranscriberAnnotation(\@utts, \@wds, \@phs);
-    writeElanAnnotation(\@utts, \@wds, \@phs, $metadata_ref);
+    writeElanAnnotation(\@utts, \@wds, \@phs, $filename, $participant);
     return;
 }
 
