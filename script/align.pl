@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2009-11-18
+# modifed date: 2010-02-03
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -24,7 +24,7 @@ use Array::Unique;
 # the normal directories, so for now we'll keep them locally
 #use lib '/p/hlp/tools/aligner/modules';
 use lib '/Users/awatts/ting-aligner/modules/';
-use Annotate::Anvil;
+use Annotate::Elan;
 use Ctl;
 
 # TODO: make these ENV declarations less HLP Lab centric
@@ -389,5 +389,5 @@ system("$ENV{S3_BIN}/sphinx3_align \\
 
 
 # generate XML output
-my $annotation = Annotate::Anvil->new();
+my $annotation = Annotate::Elan->new();
 $annotation->writeAlignment($audio_fn, 'AK');
