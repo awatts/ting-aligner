@@ -258,10 +258,14 @@ sub writeElanAnnotation {
         my ($ts1,$ts2) = ('','');
         my $j = 0;
         foreach my $t (@tsids) {
-            print $tsids[$j] . "\n";
             if ($t->{'time'} == $start) {
                 $ts1 = $t->{'slot'};
                 #delete $tsids[$j];
+                # until i figure out how to delete the item from the array
+                # so the array shrinks w/o screwing up the loop, just set
+                # the values to undef to prevent reuse
+                $t->{'time'} = 0;
+                $t->{'slot'} = undef;
                 last;
             }
             $j++;
@@ -271,6 +275,11 @@ sub writeElanAnnotation {
             if ($t->{'time'} == $end) {
                 $ts2 = $t->{'slot'};
                 #delete $tsids[$k];
+                # until i figure out how to delete the item from the array
+                # so the array shrinks w/o screwing up the loop, just set
+                # the values to undef to prevent reuse
+                $t->{'time'} = 0;
+                $t->{'slot'} = undef;
                 last;
             }
             $k++;
@@ -290,9 +299,9 @@ sub writeElanAnnotation {
     $writer->startTag('TIER',
                       'ANNOTATOR' => 'Auto',
                       'DEFAULT_LOCALE' => 'en',
-                      'LINGUISTIC_TYPE_REF' => 'Word',
-                      'PARTICIPANT' => 'AK',
-                      'TIER_ID'=> 'Word',
+                      'LINGUISTIC_TYPE_REF' => 'Phoneme',
+                      'PARTICIPANT' => $participant,
+                      'TIER_ID'=> 'Phoneme',
                       );
         for my $i (0..$#phones) {
             my $phone = shift @elems;
@@ -302,14 +311,24 @@ sub writeElanAnnotation {
             foreach my $t (@tsids) {
                 if ($t->{'time'} == $start) {
                     $ts1 = $t->{'slot'};
-                    delete $tsids[$t];
+                    #delete $tsids[$t];
+                    # until i figure out how to delete the item from the array
+                    # so the array shrinks w/o screwing up the loop, just set
+                    # the values to undef to prevent reuse
+                    $t->{'time'} = 0;
+                    $t->{'slot'} = undef;
                     last;
                 }
             }
             foreach my $t (@tsids) {
                 if ($t->{'time'} == $end) {
                     $ts2 = $t->{'slot'};
-                    delete $tsids[$t];
+                    #delete $tsids[$t];
+                    # until i figure out how to delete the item from the array
+                    # so the array shrinks w/o screwing up the loop, just set
+                    # the values to undef to prevent reuse
+                    $t->{'time'} = 0;
+                    $t->{'slot'} = undef;
                     last;
                 }
             }
