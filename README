@@ -6,12 +6,11 @@ README
 A. Use the aligner to align a transcript with a corresponding .wav audio file 
 
 1. Go to the directory of the aligner program.
-2. type "source ./tools/profile"
-3. type "align.pl AUDIOFILE TRANSCRIPT" or
-	type "align.pl" to bring up hints on how to use the program.
+2. type "./align.pl AUDIOFILE TRANSCRIPT" or
+	type "./align.pl" to bring up hints on how to use the program.
 
 4. Optionally, if you prefer manually mark the end of the sound file, type
-"align.pl AUDIOFILE TRANSCRIPT 1", and then follow instructions on the screen.
+"./align.pl AUDIOFILE TRANSCRIPT 1", and then follow instructions on the screen.
 
 B. See the results.
 
@@ -22,10 +21,10 @@ two folders named "phseg" and "wdseg". "phseg" contains the alignment results
 for phonemes, whereas the "wdseg" directory contains the alignment results
 for words.
 
-A file named "annotation.anvil" records the results in an XML format (viewable
-through firefox and etc).
+A file named "annotation.eaf" records the results in an XML format (viewable
+through Elan (http://www.lat-mpi.eu/tools/elan/), as well as any program capabale of opening XML, e.g. firefox, etc.). In future the output format will hopefully be pluggable and changeable with a command line option.
 
-Should any problem occur, please let Ting know (ting.qian@rochester.edu).
+Should any problem occur, please let Ting (ting.qian@rochester.edu) or Andrew (andrew.watts@rochester.edu).
 
 Required Perl Modules
 ---------------------
@@ -38,3 +37,4 @@ IO::File
 XML::Writer
 Date::Simple
 Array::Unique
+Text::CSV_XS
