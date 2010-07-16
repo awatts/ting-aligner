@@ -390,4 +390,4 @@ system("$ENV{S3_BIN}/sphinx3_align \\
 
 # generate XML output
 my $annotation = Annotate::Elan->new();
-$annotation->writeAlignment($audio_fn, 'AK');
+$annotation->writeAlignment($audio_fn, 'AK'); #FIXME: pass the correct participant, not just 'AK'
