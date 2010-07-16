@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2010-02-03
+# modifed date: 2010-07-16
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -23,23 +23,13 @@ use Array::Unique;
 # we have a few modules that aren't necessarily ready to be installed in
 # the normal directories, so for now we'll keep them locally
 #use lib '/p/hlp/tools/aligner/modules';
-use lib '/Users/awatts/ting-aligner/modules/';
+use lib '/hlpUsers/awatts/ting-aligner/modules/';
 use Annotate::Elan;
 use Ctl;
 
-# TODO: make these ENV declarations less HLP Lab centric
-local $ENV{MPLAYER} = "mplayer";
-local $ENV{APLAY} = "afplay";
-
-# set this to "-x" if you're on a PPC Mac or other big-endian machine
-#local $ENV{SWAP_WORD_ORDER} = "-x";
-
-local $ENV{TOOLS_HOME} = "/p/hlp/tools";
-
 # aligner
+local $ENV{TOOLS_HOME} = "/p/hlp/tools";
 local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
-#local $ENV{ALIGNER_SCRIPT_HOME} = "$ENV{TOOLS_HOME}/ting-aligner/script";
-local $ENV{ALIGNER_SCRIPT_HOME} = "/Users/awatts/ting-aligner/script";
 local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
 
 # sphinx 3 and SphinxTrain
@@ -47,7 +37,7 @@ local $ENV{S3_BIN} = "/usr/local/bin";
 local $ENV{S3_MODELS} ="$ENV{ALIGNER_DATA_HOME}/hub4_cd_continuous_8gau_1s_c_d_dd";
 local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
 
-local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNER_SCRIPT_HOME}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
+local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
@@ -61,15 +51,25 @@ sub find_manual_boundaries {
     my $boundaries = IO::File->new;
     $boundaries->open("boundaries", "r") or croak "Can't open boundaries: $!\n";
 
+    # we need a program that plays wav files with little to no screen output
+    # Linux using ALSA has aplay.
+    # MacOS X >= 10.5 comes with afplay
+    my $aplay;
+    if ( $^O eq "linux" ) {
+        $aplay = "aplay";
+    } elsif ($^O eq "darwin") {
+        $aplay = "afplay";
+    }
+
     system("clear");
 
     print "====================================\n";
     print "Press ENTER when you hear a boundary\n";
-    print "Then press CTRL + D\n";
+    print "Then press CTRL + D to finish\n";
     print "====================================\n";
 
     unless (fork) {
-        `$ENV{APLAY} audio.wav 2>&1 >/dev/null`;
+        `$aplay audio.wav 2>&1 >/dev/null`;
     } else {
         my $start = time;
 
@@ -211,7 +211,6 @@ sub get_transcript_vocab {
     $transcript->close;
     return;
 }
-
 
 # Description:
 # - input: a vocabulary and a dictionary
