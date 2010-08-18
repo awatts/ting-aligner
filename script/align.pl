@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 use strict;
 use warnings;
 use Carp;
@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2010-07-16
+# modifed date: 2010-08-18
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -300,10 +300,10 @@ unless (defined $audio_fn && defined $text_fn) {
     die "Usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT\n";
 }
 unless(-e $audio_fn) {
-    die "Cannot open audio file. Check file name?\n";
+    die "Cannot open audio file:" . $audio_fn . ". Check file name?\n";
 }
 unless(-e $text_fn) {
-    die "Cannot open transcript. Check file name?\n";
+    die "Cannot open transcript: " . $text_fn . ". Check file name?\n";
 }
 
 # pre-process transcript text
@@ -332,7 +332,7 @@ File::Util->make_dir($experiment, '--if-not-exists') or croak "Could not make di
 
 # copy audio file and transcript to that folder
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
-copy($cleaned_fp->filename, "${experiment}/transcript") or croak "Copy failed: $!";
+copy($cleaned_fp->filename, "${experiment}/transcript") or croak "Copy of cleaned transcript failed: $!";
 
 chdir($experiment) ||
     croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
@@ -343,7 +343,8 @@ subdic('var' => 1,
        'ood' => 'ood-vocab.txt',
        'vocab' =>'vocab.txt',
        'dictionary' => "$ENV{ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic",
-       'subdic' => 'vocab.dic'
+       'subdic' => 'vocab.dic',
+       'verbose' => 1
 );
 process_audio;
 
