@@ -8,7 +8,7 @@ use Carp;
 # date: 08/20/2009
 # last update: 09/27/2009
 # modified by: Andrew Watts <awatts@bcs.rochester.edu>
-# modifed date: 2010-08-18
+# modifed date: 2010-09-10
 
 # usage: align.pl AUDIO_FILE TEXT_TRANSCRIPT [MANUAL_END]
 
@@ -28,16 +28,16 @@ use Annotate::Elan;
 use Ctl;
 
 # aligner
-local $ENV{TOOLS_HOME} = "/p/hlp/tools";
-local $ENV{ALIGNER_BIN_HOME} ="$ENV{TOOLS_HOME}/aligner/bin";
-local $ENV{ALIGNER_DATA_HOME} = "$ENV{TOOLS_HOME}/aligner/data";
+my $tools_home = "/p/hlp/tools";
+my $aligner_bin_home ="${tools_home}/aligner/bin";
+my $aligner_data_home = "${tools_home}/aligner/data";
 
 # sphinx 3 and SphinxTrain
-local $ENV{S3_BIN} = "/usr/local/bin";
-local $ENV{S3_MODELS} ="$ENV{ALIGNER_DATA_HOME}/hub4_cd_continuous_8gau_1s_c_d_dd";
-local $ENV{S3EP_MODELS} = "/usr/local/share/sphinx3/model/ep";
+my $S3_bin = "/usr/local/bin";
+my $S3_models ="${aligner_data_home}/hub4_cd_continuous_8gau_1s_c_d_dd";
+my $S3EP_models = "/usr/local/share/sphinx3/model/ep";
 
-local $ENV{PATH} = "/bin:/usr/bin:$ENV{S3_BIN}:$ENV{ALIGNER_BIN_HOME}:$ENV{ALIGNER_DATA_HOME}";
+local $ENV{PATH} = "/bin:/usr/bin:${S3_bin}:${aligner_bin_home}:${aligner_data_home}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
 
@@ -91,12 +91,11 @@ sub find_manual_boundaries {
 # do initial per-segment processing of wav audio
 # based on process-audio.pl
 sub process_audio {
-    my $WAVE2FEAT = "$ENV{S3_BIN}/wave2feat";
-    my $S3EP = "$ENV{S3_BIN}/sphinx3_ep";
-    my $S3EP_MODELS = $ENV{S3EP_MODELS};
+    my $WAVE2FEAT = "${S3_bin}/wave2feat";
+    my $S3EP = "${S3_bin}/sphinx3_ep";
 
     system("$WAVE2FEAT -i audio.wav -o mfc -mswav yes -seed 2");
-    system("$S3EP -input mfc -mean $S3EP_MODELS/means -mixw $S3EP_MODELS/mixture_weights -var $S3EP_MODELS/variances >ep");
+    system("$S3EP -input mfc -mean ${S3EP_models}/means -mixw ${S3EP_models}/mixture_weights -var ${S3EP_models}/variances >ep");
     return;
 }
 
@@ -241,6 +240,7 @@ sub subdic {
     while (my $word = <$voc>) {
         next if $word =~ /^\#\#/x; # skip header
         chomp $word;
+        # eliminate whitespace
         $word =~ s/^\s*(\S+)\s*$/$1/x;
         # eliminate tags
         next if $word =~ /^</x;
@@ -306,7 +306,11 @@ unless(-e $text_fn) {
     die "Cannot open transcript: " . $text_fn . ". Check file name?\n";
 }
 
+# set whether we want messages for when we enter each stage
+my $debug = 1;
+
 # pre-process transcript text
+print "DEBUG: cleaning transcript\n" if $debug;
 my $cleaned_fp = File::Temp->new(SUFFIX => '.cleaned') or croak "Couldn't make temp file: $!";
 write_to_file(clean_transcript($text_fn), $cleaned_fp->filename);
 
@@ -331,21 +335,26 @@ if ($#dirs >= 0) {
 File::Util->make_dir($experiment, '--if-not-exists') or croak "Could not make directory: $!";
 
 # copy audio file and transcript to that folder
+print "DEBUG: Copying cleaned transcript to experiment folder\n" if $debug;
 system("resample -to 16000 $audio_fn $experiment/audio.wav");
 copy($cleaned_fp->filename, "${experiment}/transcript") or croak "Copy of cleaned transcript failed: $!";
 
 chdir($experiment) ||
     croak 'If you see this error message, please contact Ting Qian at ting.qian@rochester.edu\n';
 
+print "DEBUG: Getting transcript vocab.\n" if $debug;
 get_transcript_vocab;
 
+print "DEBUG: Creating subdic.\n" if $debug;
 subdic('var' => 1,
        'ood' => 'ood-vocab.txt',
        'vocab' =>'vocab.txt',
-       'dictionary' => "$ENV{ALIGNER_DATA_HOME}/cmudict_0.6-lg_20060811.dic",
+       #'dictionary' => "${aligner_data_home}/cmudict_0.6-lg_20060811.dic",
+       'dictionary' => "${aligner_data_home}/cmudict.0.7a_SPHINX_40.dic",
        'subdic' => 'vocab.dic',
        'verbose' => 1
 );
+print "DEBUG: Processing audio\n" if $debug;
 process_audio;
 
 if (defined $manual_end) {
@@ -358,6 +367,7 @@ if (defined $manual_end) {
 } else {
     # get the length of audio file
     # write control file
+    print "DEBUG: Writingn Ctl file\n" if $debug;
     my $ctl = IO::File->new;
     $ctl->open('ctl', 'w') or croak;
     print $ctl "./\t0\t$length\tutt1\n";
@@ -365,20 +375,21 @@ if (defined $manual_end) {
 }
 
 # align sound and transcript
+print "DEBUG: Resegmenting transcript\n" if $debug;
 resegment_transcript;
 mkdir 'phseg';
 mkdir 'wdseg';
-system("$ENV{S3_BIN}/sphinx3_align \\
+system("${S3_bin}/sphinx3_align \\
        -agc none \\
        -ctl ctl \\
        -cepext mfc \\
        -dict vocab.dic \\
-       -fdict $ENV{ALIGNER_DATA_HOME}/filler.dic \\
-       -mdef $ENV{S3_MODELS}/hub4opensrc.6000.mdef \\
-       -mean $ENV{S3_MODELS}/means \\
-       -mixw $ENV{S3_MODELS}/mixture_weights \\
-       -tmat $ENV{S3_MODELS}/transition_matrices \\
-       -var $ENV{S3_MODELS}/variances \\
+       -fdict ${aligner_data_home}/filler.dic \\
+       -mdef ${S3_models}/hub4opensrc.6000.mdef \\
+       -mean ${S3_models}/means \\
+       -mixw ${S3_models}/mixture_weights \\
+       -tmat ${S3_models}/transition_matrices \\
+       -var ${S3_models}/variances \\
        -insent insent \\
        -logfn s3alignlog \\
        -outsent outsent \\
@@ -390,4 +401,5 @@ system("$ENV{S3_BIN}/sphinx3_align \\
 
 # generate XML output
 my $annotation = Annotate::Elan->new();
+print "DEBUG: writing final aligned file" if $debug;
 $annotation->writeAlignment($audio_fn, 'AK'); #FIXME: pass the correct participant, not just 'AK'
