@@ -3,7 +3,7 @@ A simplistic speech aligner
 README
 ---------------------------
 
-A. Use the aligner to align a transcript with a corresponding .wav audio file 
+A. Use the aligner to align a transcript with a corresponding .wav audio file
 
 1. Go to the directory of the aligner program.
 2. type "./align.pl AUDIOFILE TRANSCRIPT" or
@@ -14,8 +14,8 @@ A. Use the aligner to align a transcript with a corresponding .wav audio file
 
 B. See the results.
 
-By doing the above three steps, the program will create a directory with the 
-same name as that of the sound file (so it's important to name sound files 
+By doing the above three steps, the program will create a directory with the
+same name as that of the sound file (so it's important to name sound files
 differently. e.g. subject1.wav, subject2.wav). Inside the directory there are
 two folders named "phseg" and "wdseg". "phseg" contains the alignment results
 for phonemes, whereas the "wdseg" directory contains the alignment results

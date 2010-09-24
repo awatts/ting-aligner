@@ -25,6 +25,17 @@ import re
 import shutil
 import wave
 
+# aligner
+tools_home = "/p/hlp/tools"
+aligner_bin_home = tools_home + "/aligner/bin"
+aligner_data_home = tools_home + "/aligner/data"
+
+# sphinx 3 and SphinxTrain
+S3_bin = "/usr/local/bin"
+S3_models = aligner_data_home + "/hub4_cd_continuous_8gau_1s_c_d_dd"
+S3EP_models = "/usr/local/share/sphinx3/model/ep"
+S3EP_models = "/usr/local/share/sphinx3/model/ep"
+
 def find_manual_boundaries():
     pass
 
@@ -41,9 +52,9 @@ def process_audio():
     with open('ep', 'w') as ep_outfile:
         subprocess.Popen(['sphinx3_ep',
             '-input', 'mfc',
-            '-mean', 'S3EP_MODELS/means', #FIXME: define S3EP_MODELS
-            '-mixw', 'S3EP_MODELS/mixture_weights',
-            '-var', 'S3EP_MODELS/variances'],
+            '-mean', S3EP_MODELS + '/means',
+            '-mixw', S3EP_MODELS + '/mixture_weights',
+            '-var', S3EP_MODELS+ '/variances'],
             stdout = ep_outfile)
 
 def get_wave_length(wave_fn):
@@ -95,7 +106,7 @@ def resegment_transcript():
     unttNum = 0
     with open('ctl', 'r') as ctl:
           for ctline in ctl:
-            utt = re.compile('utt(?:\d+-)?(\d+)$', re.I)
+            utt = re.compile(r'utt(?:\d+-)?(\d+)$', re.I)
             res = re.search(utt,ctline)
             if res:
                 segname = res.group(0)
@@ -138,8 +149,8 @@ def subdic(vocab_fn, dict_fn, subdic_fn, ood_fn = '',
     Create a dictionary of words in the transcript
     """
     vocab = {}
-    header_re = re.compile('/^\#\#/')
-    tag_re = re.compile('/^</')
+    header_re = re.compile(r'/^\#\#/')
+    tag_re = re.compile(r'/^</')
     with open(vocab_fn, 'r') as vocab:
         for word in vocab:
             if not re.search(header_re, word):
@@ -152,8 +163,8 @@ def subdic(vocab_fn, dict_fn, subdic_fn, ood_fn = '',
     with open(dict_fn, 'r') as dic:
         with open(subdic_fn, 'w') as subdic:
             #FIXME: what are these regexes about?
-            re1 = re.compile('/^([^\s\(]+)/')
-            re2 = re.compile('/^([^\s]+)\s/')
+            re1 = re.compile(r'/^([^\s\(]+)/')
+            re2 = re.compile(r'/^([^\s]+)\s/')
             for line in dic:
                 word = ""
                 if novar:
@@ -189,25 +200,27 @@ if __name__ == '__main__':
 
     wavlen = get_wave_length(audio_fn)
 
-    ap, af = os.path.split(audio_fn)
+    # Get the filename for the sound file and the last directory component
+    # which will be used as the name of the directory where the output will
+    # go, because by convention this has been the unique ID for the subject
+    audio_path, audio_file = os.path.split(audio_fn)
+    path_pre, final_pre = os.path.split(audio_path)
+    os.mkdir(final_pre)
+    os.chdir(final_pre)
 
-    # get name of subjid
-    # create the directory for subjid/audio_fn
-    # chdir to the subjid/audio_fn directory
-
-    downsample_wav(audio_fn, 'prefix/audio.wav')
+    downsample_wav(audio_fn, final_pre + '/audio.wav')
 
     get_transcript_vocab()
 
     subdic('var', 1,
            'ood', 'ood-vocab.txt',
            'vocab', 'vocab.txt',
-           'dictionary', os.environ['ALIGNER_DATA_HOME'] + '/cmudict_0.6-lg_20060811.dic',
+           'dictionary', aligner_data_home + '/cmudict.0.7a_SPHINX_40.dic',
            'subdic', 'vocab.dic')
 
-    process_audio;
+    process_audio()
 
-    resegment_transcript;
+    resegment_transcript()
 
     os.mkdir('phseg')
     os.mkdir('wdseg')
@@ -217,13 +230,12 @@ if __name__ == '__main__':
                       '-ctl', 'ctl',
                       '-cepext', 'mfc',
                       '-dict', 'vocab.dic',
-                      #FIXME: get these variables from from cfg file, not env
-                      '-fdict', os.environ['ALIGNER_DATA_HOME'] + '/filler.dic',
-                      '-mdef', os.environ['S3_MODELS'] + '/hub4opensrc.6000.mdef',
-                      '-mean', os.environ['S3_MODELS'] + '/means',
-                      '-mixw', os.environ['S3_MODELS'] + '/mixture_weights',
-                      '-tmat', os.environ['S3_MODELS'] + '/transition_matrices',
-                      '-var', os.environ['S3_MODELS'] + '/variances',
+                      '-fdict', aligner_data_home + '/filler.dic',
+                      '-mdef', S3_models + '/hub4opensrc.6000.mdef',
+                      '-mean', S3_models + '/means',
+                      '-mixw', S3_models + '/mixture_weights',
+                      '-tmat', S3_models + '/transition_matrices',
+                      '-var', S3_models + '/variances',
                       '-insent', insent,
                       '-logfn', s3alignlog,
                       '-outsent', outsent,
