@@ -14,16 +14,18 @@ use Carp;
 
 use Audio::Wav;
 use File::Copy;
-use File::Spec;
+use File::Spec::Functions qw(:ALL);
 use File::Util;
 use File::Temp;
+use File::Basename;
 use IO::File;
 use Array::Unique;
+use Time::HiRes qw(time);
 
 # we have a few modules that aren't necessarily ready to be installed in
 # the normal directories, so for now we'll keep them locally
 #use lib '/p/hlp/tools/aligner/modules';
-use lib '/hlpUsers/awatts/ting-aligner/modules/';
+use lib catdir(dirname($0), updir(), 'modules');
 use Annotate::Elan;
 use Ctl;
 
@@ -40,6 +42,7 @@ my $S3EP_models = "/usr/local/share/sphinx3/model/ep";
 local $ENV{PATH} = "/bin:/usr/bin:${S3_bin}:${aligner_bin_home}:${aligner_data_home}";
 
 my ($audio_fn, $text_fn, $manual_end) = @ARGV;
+my $participant = 'XXX'; #FIXME: pass the correct participant, not just 'XXX'
 
 # find utterance boundaries manually
 # based on make-ctl.pl
@@ -320,9 +323,9 @@ write_to_file(clean_transcript($text_fn), $cleaned_fp->filename);
 my $length = get_wave_length($audio_fn);
 
 # get the final part of the path component in order to name the results dir
-my ($volume,$directories,$file) = File::Spec->splitpath( $audio_fn );
-my $cdirs = File::Spec->canonpath($directories);
-my @dirs = File::Spec->splitdir($cdirs);
+my ($volume,$directories,$file) = splitpath( $audio_fn );
+my $cdirs = canonpath($directories);
+my @dirs = splitdir($cdirs);
 
 my $experiment;
 if ($#dirs >= 0) {
@@ -367,7 +370,7 @@ if (defined $manual_end) {
 } else {
     # get the length of audio file
     # write control file
-    print "DEBUG: Writingn Ctl file\n" if $debug;
+    print "DEBUG: Writing Ctl file\n" if $debug;
     my $ctl = IO::File->new;
     $ctl->open('ctl', 'w') or croak;
     print $ctl "./\t0\t$length\tutt1\n";
@@ -398,8 +401,11 @@ system("${S3_bin}/sphinx3_align \\
        -beam 1e-80"
 );
 
-
-# generate XML output
-my $annotation = Annotate::Elan->new();
-print "DEBUG: writing final aligned file" if $debug;
-$annotation->writeAlignment($audio_fn, 'AK'); #FIXME: pass the correct participant, not just 'AK'
+if ($? == -1) {
+    print "Failed to align: $!\n";
+} else
+    # generate XML output
+    my $annotation = Annotate::Elan->new();
+    print "DEBUG: writing final aligned file" if $debug;
+    $annotation->writeAlignment($audio_fn, $participant);
+}

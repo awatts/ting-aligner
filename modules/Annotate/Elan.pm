@@ -7,8 +7,10 @@ use Carp;
 
 use XML::Writer;
 use IO::File;
+use File::Basename;
 use DateTime;
 
+use lib dirname($0);
 use Ctl;
 
 our $VERSION = 0.001;

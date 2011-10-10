@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Carp;
 
+use IO::File;
 use File::Temp;
 use Text::CSV_XS;
 
@@ -39,7 +40,8 @@ my $csv = Text::CSV_XS->new({
                             sep_char => "\t"
                         }) or croak "Cannot use CSV: ".Text::CSV->error_diag();
 $csv->column_names(qw/audio transcript/);
-open (my $idx_fp, '<', $idx_fn) or croak "Couldn't open file: $!";
+my $idx_fp = IO::File->new;
+$idx_fp->open($idx_fn, 'r') or croak "Couldn't open file: $!";
 while (my $row = $csv->getline_hr($idx_fp)) {
     my $audio_fn = $row->{audio};
     my $text_transcript = $row->{transcript};
@@ -48,7 +50,7 @@ while (my $row = $csv->getline_hr($idx_fp)) {
     print $temp_trs $text_transcript;
 
     my $temp_fn = $temp_trs->filename;
-    system("align.pl $audio_fn $temp_fn");
+    system("~/ting-aligner/script/align.pl $audio_fn $temp_fn");
 }
 $csv->eof or $csv->error_diag();
-close $idx_fp;
+$idx_fp->close;

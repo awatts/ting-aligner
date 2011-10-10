@@ -14,6 +14,7 @@ our $VERSION = 0.001;
 #
 # Based almost entirely on the make-ctl.pl script written by
 # various people in the CS department at the University of Rochester
+# and the make-anvil-annotation.pl written by Ting Qian
 #
 # Rewritten into module form and cleaned up to not make Perl::Critic sob
 # too much by Andrew Watts
@@ -23,6 +24,8 @@ our $VERSION = 0.001;
 my $epsilon = 75;
 
 my $framesPerSecond = 100;
+
+my $xmax = 0;
 
 sub new {
     my $invocant = shift;
@@ -34,7 +37,6 @@ sub new {
 
 sub addInterval {
     my ($array, $interval) = @_;
-    my $xmax = 0;
     my $secondsPerFrame = 1 / $framesPerSecond;
     my $eps = $secondsPerFrame / 100; #stupid floating point error
 
