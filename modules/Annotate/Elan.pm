@@ -25,7 +25,10 @@ sub writeAlignment {
     my @wds = @$wdsref;
     my @phs = @$phsref;
 
-    my $eaf = IO::File->new('annotation.eaf', 'w') or croak "Can't open annotation.eaf: $!\n";
+    my $eaf_name = $filename;
+    $eaf_name =~ s/\.wav//x;
+
+    my $eaf = IO::File->new($eaf_name . '.eaf', 'w') or croak "Can't open " . $eaf_name .".eaf: $!\n";
     my $writer = XML::Writer->new(OUTPUT => $eaf, DATA_MODE => 1, UNSAFE => 1, DATA_INDENT => 4);
 
     my $date = DateTime->now(time_zone => 'America/New_York');

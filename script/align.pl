@@ -331,7 +331,7 @@ my $experiment;
 if ($#dirs >= 0) {
     $experiment = "$dirs[-1]/$file/";
 } else {
-    $experiment = $file;
+    $experiment = $file . "_aligned";
 }
 
 # make a folder to store the files
@@ -403,7 +403,7 @@ system("${S3_bin}/sphinx3_align \\
 
 if ($? == -1) {
     print "Failed to align: $!\n";
-} else
+} else {
     # generate XML output
     my $annotation = Annotate::Elan->new();
     print "DEBUG: writing final aligned file" if $debug;
